@@ -1,11 +1,11 @@
 **Français**
-- Coupe : deux classements séparés quand on affiche le classement (Tab) : en haut la manche en cours (temps, DNF, points gagnés), en dessous le classement de la coupe (points, FINALIST / WINNER, points gagnés à la dernière manche). 16 joueurs visibles dans chacun.
-- Coupe : les spectateurs sont listés dans la barre de titre du classement de la coupe (plus dans les tableaux).
-- Les classements ne clignotent plus à l'arrivée de chaque joueur (classement de la coupe et classement des écarts en haut à gauche).
-- Classement des écarts en haut à gauche : si vous êtes au-delà de la 10e place, la dernière ligne affiche votre position (ou celle du joueur suivi en spectateur).
+- Spectateur : cliquer sur un joueur dans le classement (Tab, manche ou coupe) le suit à la caméra (la caméra libre passe en vue 1re personne).
+- Spectateur : la caméra ne bouge plus avec la souris quand le classement (Tab) ou le menu Échap est ouvert.
+- Fin de manche / arrivée : la bande noire du menu à gauche ne couvre plus que ses boutons (en bas) ; le classement des écarts en haut à gauche reste visible.
+- Les spectateurs connectés sont affichés en bas à gauche (œil + nom), au-dessus de « Lanppart3 Mod », quand les classements sont à l'écran (Coupe et Time Attack).
 
 **English**
-- Cup: two separate rankings when the leaderboard is shown (Tab): on top the current round (times, DNF, points won), below the cup ranking (points, FINALIST / WINNER, points won in the last round). 16 players visible in each one.
-- Cup: the spectators are listed in the title bar of the cup ranking (no longer in the tables).
-- The rankings no longer flicker when a player finishes (cup ranking and gap ranking at the top left).
-- Gap ranking at the top left: if you are beyond the 10th place, the last line shows your position (or the one of the player followed as a spectator).
+- Spectator: clicking a player in the leaderboard (Tab, round or cup) follows him with the camera (the free camera switches to the first person view).
+- Spectator: the camera no longer moves with the mouse while the leaderboard (Tab) or the Escape menu is open.
+- End of the round / finish: the black bar of the left menu only covers its buttons (at the bottom); the gap ranking at the top left stays visible.
+- The connected spectators are shown at the bottom left (eye + name), above "Lanppart3 Mod", while the rankings are on screen (Cup and Time Attack).

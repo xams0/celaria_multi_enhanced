@@ -321,6 +321,23 @@ static void target_look(NetPlayer *t, double *yaw, double *pitch) {
 	*pitch = 0;
 }
 
+static void render_size(void *self, void *other, double *w, double *h);
+
+#define VAR_PAUSE 1013// obj_controller.pause: pause menu (Escape) open
+
+// mouse position in GUI coordinates (render size of the game), 0 if unknown
+static int mouse_gui(void *self, void *other, double *x, double *y) {
+	POINT p;
+	RECT rc;
+	if (game_window == NULL || GetCursorPos(&p) == 0 || ScreenToClient(game_window, &p) == 0 || GetClientRect(game_window, &rc) == 0) return 0;
+	if (rc.right <= 0 || rc.bottom <= 0) return 0;
+	double w, h;
+	render_size(self, other, &w, &h);
+	*x = p.x * w / rc.right;
+	*y = p.y * h / rc.bottom;
+	return 1;
+}
+
 #define MOUSE_SENSITIVITY 0.1// degrees per mouse count (as the default settings of the game)
 #define THIRD_PERSON_DISTANCE 4.5
 
@@ -350,6 +367,28 @@ static void update(void *self, void *other) {
 	if (not_racing_since == 0) not_racing_since = now_ms;
 	int focus = game_has_focus();
 	int v_pressed = focus && key_pressed('V');
+	int clicked = key_pressed(VK_LBUTTON) && focus;
+	// leaderboard (Tab, end of the round) or pause menu open: the mouse is used by the menus, the camera doesn't move
+	int leaderboard = leaderboard_panel_open();
+	int ui_open = leaderboard || obj_var(OBJ_CONTROLLER, VAR_PAUSE) > 0.5;
+	if (ui_open) mx = my = 0;
+	static int ui_open_logged = -1;
+	if (ui_open != ui_open_logged) {
+		ui_open_logged = ui_open;
+		mod_log("spectator: menu / leaderboard open %d (camera locked)", ui_open);
+	}
+	// click on a player of the leaderboard: followed by the spectator view
+	if (clicked && leaderboard && view != VIEW_OFF) {
+		double gx, gy;
+		int id = mouse_gui(self, other, &gx, &gy) ? leaderboard_player_at(gx, gy) : -1;
+		if (id >= 0 && id != cup_local_id() && find_player(id)) {
+			target_id = id;
+			if (view == VIEW_FREE) view = VIEW_FIRST_PERSON;
+			orbit_initialised = 0;
+			target_lost_since = 0;
+			mod_log("spectator: player %d chosen in the leaderboard", id);
+		}
+	}
 	if (focus) {
 		// V: next view (first person -> third person -> free camera). Only while spectating: a player who races enters the
 		// spectator mode with the Spectator button of the pause menu (or automatically once he can't race any more).
@@ -433,7 +472,7 @@ static void update(void *self, void *other) {
 		double a = cam_yaw * M_PI / 180.0;
 		double rx = -sin(a), ry = cos(a);// right
 		double speed = (key_down(VK_SHIFT) ? 36.0 : 12.0) * dt;
-		if (focus) {
+		if (focus && ui_open == 0) {
 			double v[3] = { 0, 0, 0 };
 			if (key_down('Z') || key_down('W')) for (int k = 0; k < 3; k++) v[k] += d[k];
 			if (key_down('S')) for (int k = 0; k < 3; k++) v[k] -= d[k];
@@ -951,6 +990,118 @@ static void draw_mod_label(void *self, void *other) {
 	((void(__cdecl *)(int))ADDR(DIRECT_DRAW_SET_VALIGN))(0);
 }
 
+// spectators (observers) in the bottom left corner, above the mod label, while the leaderboard is shown:
+// an eye and the name
+static void draw_eye(float cx, float cy, float size) {
+	float w = size * 0.5f, hh = size * 0.32f;
+	for (float dy = -hh; dy <= hh; dy += 1.0f) {// almond: white
+		float k = dy / hh, half = w * (1.0f - k * k);
+		hud_rect(cx - half, cy + dy, cx + half, cy + dy + 1.0f, COLOUR_WHITE, 1.0f);
+	}
+	float r = size * 0.2f;
+	for (float dy = -r; dy <= r; dy += 1.0f) {// iris
+		float half = (float)sqrt(r * r - dy * dy);
+		hud_rect(cx - half, cy + dy, cx + half, cy + dy + 1.0f, 0xC08020, 1.0f);
+	}
+	float p = size * 0.09f;
+	for (float dy = -p; dy <= p; dy += 1.0f) {// pupil
+		float half = (float)sqrt(p * p - dy * dy);
+		hud_rect(cx - half, cy + dy, cx + half, cy + dy + 1.0f, COLOUR_BLACK, 1.0f);
+	}
+}
+
+static void draw_spectator_list(void *self, void *other) {
+	if (mod_active() == 0 || g_server_supports_mod == 0 || is_multiplayer() == 0 || leaderboard_panel_open() == 0) return;
+	const char *names[16];
+	int count = cup_spectator_list(names, 16);
+	if (count == 0) return;
+	double w, h;
+	render_size(self, other, &w, &h);
+	const double scale = 1.2;
+	hud_font(0, 1);
+	float th = text_height(self, other) * (float)scale, line = th + 10;
+	float bottom = (float)h - text_height(self, other) * 1.4f - 24;// above the mod label
+	for (int i = 0; i < count; i++) {
+		float y = bottom - line * (float)(count - i);
+		char text[96];
+		snprintf(text, sizeof text, "-  %s", names[i]);
+		float icon = th * 1.3f;
+		hud_rect(4, y, 20 + icon + 6 + text_width(self, other, text) * (float)scale, y + line - 2, COLOUR_BLACK, 0.6f);
+		draw_eye(12 + icon / 2, y + (line - 2) / 2, icon);
+		hud_font(0, 1);
+		hud_text(self, other, 12 + icon + 6, y + (line - 2) / 2, text, scale, COLOUR_WHITE);
+	}
+	hud_colour(COLOUR_WHITE, 1.0f);
+	((void(__cdecl *)(int))ADDR(DIRECT_DRAW_SET_VALIGN))(0);
+}
+
+// end of the map / of the round (cup server): the black bar of the left menu covers only its buttons (the checkpoint
+// ranking stays visible above it). The buttons draw themselves after the bar: top of the highest one in the last frame.
+#define GML_OBJ_BLACK_BAR_DEFAULT_DRAW 0x009fa160// obj_black_bar_default user event 0: full height bar
+#define GML_OBJ_BUTTON_LEFT_BAR_DRAW 0x009eb370// obj_button_left_bar user event 1: draws the button
+#define VAR_GLOBAL_LEFTBAR_X 0x2f7
+#define VAR_GLOBAL_LEFTBAR_W 0x2f5
+#define VAR_GLOBAL_LEFTBAR_BUTTON_H 0x2f4
+static GmlEvent orig_black_bar_draw, orig_button_left_bar_draw;
+
+static double builtin_var_of(void *inst, uintptr_t slot) {
+	RValue v = { 0 };
+	YY_BUILTIN_GET(inst, *(int *)ADDR(slot), ARRAY_NONE, &v);
+	double d = yy_to_real(&v);
+	yy_clear(&v);
+	return d;
+}
+static double buttons_top, buttons_top_frame_value;
+static unsigned buttons_frame;
+
+static void __cdecl hook_button_left_bar_draw(void *self, void *other) {
+	orig_button_left_bar_draw(self, other);
+	if (self == NULL) return;
+	double y = builtin_var_of(self, SLOT_BUILTIN_VAR_B);
+	if (buttons_frame != g_frame) {// new frame: the value of the last one is kept for the bar
+		buttons_top_frame_value = buttons_top;
+		buttons_frame = g_frame;
+		buttons_top = 1e9;
+	}
+	if (y > -1000 && y < buttons_top) buttons_top = y;
+}
+
+// variables of the left bar: object 77 (as obj_black_bar_default reads them)
+#define OBJ_LEFTBAR_VARS 77
+static double global_real(int var) {
+	RValue v = { 0 };
+	YY_VAR_GET(OBJ_LEFTBAR_VARS, var, ARRAY_NONE, &v);
+	int kind = v.kind & 0xffffff;
+	double d = kind == KIND_REAL ? v.real : kind == 7 ? v.i32 : kind == 10 ? (double)v.i64 : 0;
+	yy_clear(&v);
+	return d;
+}
+
+static void __cdecl hook_black_bar_draw(void *self, void *other) {
+	int finish = obj_var(OBJ_CONTROLLER, VAR_MAP_FINISHED) > 0.5 || obj_var(OBJ_NETWORK_DATA, VAR_ROUND_OVER) > 0.5;
+	double top_button = g_frame - buttons_frame <= 2 ? (buttons_frame == g_frame ? buttons_top_frame_value : buttons_top) : 1e9;
+	if (finish == 0 || top_button >= 1e9 || cup_menu_active() == 0 || obj_var(OBJ_CONTROLLER, VAR_PAUSE) > 0.5) {
+		orig_black_bar_draw(self, other);
+		return;
+	}
+	double w, h;
+	render_size(self, other, &w, &h);
+	double x = global_real(VAR_GLOBAL_LEFTBAR_X), bw = global_real(VAR_GLOBAL_LEFTBAR_W), bh = global_real(VAR_GLOBAL_LEFTBAR_BUTTON_H);
+	static int logged;
+	if (logged == 0) {
+		logged = 1;
+		mod_log("finish menu: left bar x %.0f w %.0f button h %.0f, top button %.0f", x, bw, bh, top_button);
+	}
+	if (bw <= 0) {
+		orig_black_bar_draw(self, other);
+		return;
+	}
+	double top = top_button - (bh > 0 ? bh * 0.5 : 20);
+	if (top < 0) top = 0;
+	hud_rect((float)x, (float)top, (float)(x + bw), (float)h, COLOUR_BLACK, 0.8f);
+	hud_colour(COLOUR_WHITE, 1.0f);
+}
+
 static void set_alphablend(void *self, void *other, RValue *value) {
 	RValue r = { 0 };
 	RValue *args[1] = { value };
@@ -1012,6 +1163,7 @@ static RValue *__cdecl hook_draw_gui(void *self, void *other, RValue *result, in
 	on.real = 1;
 	set_alphablend(self, other, &on);
 	leaderboard_draw_cup(self, other);
+	draw_spectator_list(self, other);
 	draw_mod_label(self, other);
 	set_alphablend(self, other, (RValue *)ADDR(CONST_LAST_ALPHABLEND));
 	return result;
@@ -1029,4 +1181,6 @@ void spectator_install(void) {
 		orig_reset_ask = (GmlScript)hook_install(ADDR(GML_BEV_SPEEDRUN_RESET_ASK), PROLOGUE, sizeof PROLOGUE, hook_reset_ask);
 	orig_create_pause_buttons = (GmlScript)hook_install(ADDR(GML_SCR_CREATE_PAUSE_BUTTONS), PROLOGUE, sizeof PROLOGUE, hook_create_pause_buttons);
 	orig_white_overlay = (GmlScript)hook_install(ADDR(GML_SCR_RENDER_WHITE_OVERLAY_SCREEN), PROLOGUE, sizeof PROLOGUE, hook_white_overlay);
+	orig_button_left_bar_draw = (GmlEvent)hook_install(ADDR(GML_OBJ_BUTTON_LEFT_BAR_DRAW), PROLOGUE, sizeof PROLOGUE, hook_button_left_bar_draw);
+	orig_black_bar_draw = (GmlEvent)hook_install(ADDR(GML_OBJ_BLACK_BAR_DEFAULT_DRAW), PROLOGUE, sizeof PROLOGUE, hook_black_bar_draw);
 }

@@ -83,8 +83,12 @@ typedef struct {
 // cup ranking sent by the server (second table of the leaderboard), names of the observers ("" if none)
 int cup_ranking(const CupRankEntry **entries);
 const char *cup_spectators(void);
+int cup_spectator_list(const char *names[], int max);
 // leaderboard.c: second table (cup ranking) under the leaderboard of the game, drawn at the end of the GUI
 void leaderboard_draw_cup(void *self, void *other);
+// the leaderboard panel is open; player of the row at this GUI position (last frame), -1 if none
+int leaderboard_panel_open(void);
+int leaderboard_player_at(double x, double y);
 #define MAX_CP 64
 void cup_local_checkpoint(int index, long ms);
 // rank and gap (ms) with the best time at a checkpoint (0 = finish); 0 if nothing to compare with

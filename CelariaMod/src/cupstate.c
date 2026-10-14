@@ -26,6 +26,10 @@ static int collecting_states, pending_seen;
 static CupRankEntry ranking[MAX_RANKING], pending[MAX_RANKING];
 static int ranking_count, pending_count;
 static char spectator_names[256];
+// the same names one by one (bottom left corner)
+#define MAX_SPECTATORS 16
+static char spectator_list[MAX_SPECTATORS][64];
+static int spectator_count;
 
 static int known;// a CUPROUND or CUPST message was received
 static int cup_mode_flag;// the server runs the cup mode (CUPROUND)
@@ -68,6 +72,7 @@ void cupstate_reset(void) {
 	pending_count = 0;
 	collecting_states = 0;
 	spectator_names[0] = 0;
+	spectator_count = 0;
 }
 
 int cup_known(void) { return known; }
@@ -143,6 +148,13 @@ int cup_ranking(const CupRankEntry **entries) {
 
 const char *cup_spectators(void) { return spectator_names; }
 
+
+int cup_spectator_list(const char *names[], int max) {
+	int n = spectator_count < max ? spectator_count : max;
+	for (int i = 0; i < n; i++) names[i] = spectator_list[i];
+	return n;
+}
+
 int cupstate_handle_message(const char *text) {
 	if (collecting_states && pending_seen && strncmp(text, "\x01" "CUPST", 6) != 0) {
 		memcpy(states, pending_states, sizeof states);
@@ -172,6 +184,13 @@ int cupstate_handle_message(const char *text) {
 	// "\x01CUPSPEC <name>\x02<name>..."
 	if (strncmp(text, "\x01" "CUPSPEC", 8) == 0) {
 		const char *p = text[8] == ' ' ? text + 9 : text + 8;
+		spectator_count = 0;
+		for (const char *s = p; *s && spectator_count < MAX_SPECTATORS;) {
+			const char *e = strchr(s, 2);
+			size_t len = e ? (size_t)(e - s) : strlen(s);
+			if (len > 0) snprintf(spectator_list[spectator_count++], sizeof spectator_list[0], "%.*s", (int)len, s);
+			s += len + (e ? 1 : 0);
+		}
 		size_t i = 0;
 		for (; *p && i + 3 < sizeof spectator_names; p++) {
 			if (*p == 2) {

@@ -6,6 +6,7 @@
 // user event 1): the name ("<status> | <player>") starts after the place column (width of "000000" in font 5).
 #include <windows.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "hook.h"
 #include "mod.h"
@@ -94,6 +95,41 @@ static double rows_left, rows_bottom, rows_height;
 
 #define VAR_ENTRY_PLACE_STRING 527
 
+// rows of the leaderboard (panel of the game and cup table) drawn in the last frame, with their player: a spectator
+// clicks on a name to follow this player
+#define MAX_CLICK_ROWS 64
+enum { ROWS_PANEL, ROWS_CUP };// lists: rows of the panel (drawn before the frame counter changes), rows of the cup table
+static struct {
+	float x1, y1, x2, y2;
+	int id;
+} click_rows[2][MAX_CLICK_ROWS];
+static int click_count[2];
+static unsigned click_frame[2];
+
+static void add_click_row(int list, double x1, double y1, double x2, double y2, int id) {
+	if (click_frame[list] != g_frame) {
+		click_frame[list] = g_frame;
+		click_count[list] = 0;
+	}
+	if (id < 0 || click_count[list] >= MAX_CLICK_ROWS) return;
+	click_rows[list][click_count[list]].x1 = (float)x1;
+	click_rows[list][click_count[list]].y1 = (float)y1;
+	click_rows[list][click_count[list]].x2 = (float)x2;
+	click_rows[list][click_count[list]].y2 = (float)y2;
+	click_rows[list][click_count[list]].id = id;
+	click_count[list]++;
+}
+
+int leaderboard_player_at(double x, double y) {
+	for (int list = 0; list < 2; list++) {
+		if (g_frame - click_frame[list] > 2) continue;
+		for (int i = 0; i < click_count[list]; i++)
+			if (x >= click_rows[list][i].x1 && x < click_rows[list][i].x2 && y >= click_rows[list][i].y1 && y < click_rows[list][i].y2)
+				return click_rows[list][i].id;
+	}
+	return -1;
+}
+
 static int cup_table_shown(void) {
 	const CupRankEntry *e;
 	return cup_server() && cup_mode() && g_records_tab == 0 && cup_ranking(&e) > 0;
@@ -127,6 +163,10 @@ static void __cdecl hook_entry_draw(void *self, void *other) {
 	orig_entry_draw(self, other);
 	if (strip) yy_set_string(yy_self_var(self, VAR_ENTRY_USERNAME), full);
 	double y = builtin_var(self, SLOT_BUILTIN_VAR_B), h = builtin_var(self, SLOT_BUILTIN_HEIGHT);
+	if (strip && g_records_tab == 0) {
+		double x = builtin_var(self, SLOT_BUILTIN_VAR_A);
+		add_click_row(ROWS_PANEL, x, y, x + ROWS_WIDTH, y + h, atoi(bracket + 1));
+	}
 	if (rows_frame != g_frame) {
 		rows_frame = g_frame;
 		rows_bottom = 0;
@@ -173,39 +213,8 @@ static void text(void *self, void *other, double x, double y, const char *s, int
 	yy_clear(&a[2]);
 }
 
-#define VAR_GLOBAL_PERSONAL_BEST_HEADER 1016// global.personal_best_header_element (textbox "Personal Best")
-#define INSTANCE_GLOBAL (-5)
-
-typedef int(__cdecl *FnWithNew)(void *iterator, void **pSelf, void **pOther, int object);
-typedef char(__cdecl *FnWithNext)(void *iterator, void **pSelf, void **pOther);
-typedef void(__cdecl *FnWithDelete)(void *iterator, void **pSelf, void **pOther);
-#define YY_WITH_NEW ((FnWithNew)ADDR(0x00b9d720))
-#define YY_WITH_DELETE ((FnWithDelete)ADDR(0x00b8fd50))
-
-static int number_of(const RValue *v, double *out) {
-	switch (v->kind & 0xffffff) {
-	case KIND_REAL: *out = v->real; return 1;
-	case 7: *out = v->i32; return 1;
-	case 10: *out = (double)v->i64; return 1;
-	}
-	return 0;
-}
-
-// top of the title "Personal Best" at the bottom of the panel (the own entry is below it), 0 if unknown
-static double personal_best_top(void *self, void *other) {
-	RValue v = { 0 };
-	YY_VAR_GET(INSTANCE_GLOBAL, VAR_GLOBAL_PERSONAL_BEST_HEADER, ARRAY_NONE, &v);
-	double id;
-	int known = number_of(&v, &id);
-	yy_clear(&v);
-	if (known == 0 || id < 100000) return 0;// instance ids start at 100000
-	uint8_t iterator[1024];
-	void *s = self, *o = other;
-	double top = 0;
-	if (YY_WITH_NEW(iterator, &s, &o, (int)id) > 0) top = builtin_var(s, SLOT_BUILTIN_VAR_B);
-	YY_WITH_DELETE(iterator, &s, &o);
-	return top;
-}
+// the leaderboard panel of the game is open (Tab, end of the map / of the round): its rows were drawn just now
+int leaderboard_panel_open(void) { return rows_frame != 0 && g_frame - rows_frame <= 2; }
 
 // text shortened with "..." to fit in the width (font of the leaderboard, scale applied)
 static void fit_text(void *self, void *other, char *s, double width, double scale) {
@@ -217,14 +226,10 @@ static void fit_text(void *self, void *other, char *s, double width, double scal
 }
 
 // Second table under the leaderboard of the game (cup server, tab "Server"): the cup ranking (place, player, status /
-// points, points won in the last round), the observers in its title bar. Same width as the leaderboard; the rows are
-// made smaller if the table doesn't fit above the own entry ("Personal Best") at the bottom of the panel.
+// points, points won in the last round), the observers in its title bar. Same width and row height as the leaderboard.
 void leaderboard_draw_cup(void *self, void *other) {
 	if (cup_table_shown() == 0 || rows_height <= 0) return;
-	// the game recreates the rows of the panel when the leaderboard changes (a player finishes): the last geometry is
-	// kept while the panel is open (title "Personal Best" present)
-	double pb_top = personal_best_top(self, other);
-	if (g_frame - rows_frame > 2 && (pb_top <= 0 || g_frame - rows_frame > 120)) return;
+	if (leaderboard_panel_open() == 0) return;
 	const CupRankEntry *e;
 	int count = cup_ranking(&e);
 	if (count == 0) return;
@@ -245,18 +250,13 @@ void leaderboard_draw_cup(void *self, void *other) {
 		text(self, other, x + w - 12, y + h * 0.55f, "Points", 2, COLOUR_GREY, 0.9);
 	}
 	y += h * 1.1f;
-	// row height: everything above the title "Personal Best"
-	double limit = pb_top - 2;
-	if (limit > y && y + count * h > limit) {
-		h = (float)((limit - y) / count);
-		if (h < rows_height * 0.6) h = (float)(rows_height * 0.6);
-	}
-	double scale = h < rows_height * 0.95 ? h / rows_height + 0.05 : 1.0;
+	double scale = 1.0;
 	int local = cup_local_id();
 	double place_w = string_width(self, other, "000000");
 	for (int i = 0; i < count; i++, y += h) {
 		const CupRankEntry *r = &e[i];
 		rect(x, y - 1, x + w, y + h + 1, i % 2 ? COLOUR_ROW_B : COLOUR_ROW_A, 1.0f);
+		add_click_row(ROWS_CUP, x, y, x + w, y + h, r->id);
 		int colour = r->id == local ? COLOUR_TITLE : 0xFFFFFF;
 		char buf[64];
 		snprintf(buf, sizeof buf, "%d.", r->place);

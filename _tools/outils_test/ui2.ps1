@@ -46,6 +46,12 @@ switch ($action) {
     $vk = [byte][int]$key; $sc = [byte][U2]::MapVirtualKey($vk, 0)
     [U2]::keybd_event($vk, $sc, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds $ms; if ($out) { Shot $out; "shot $out" }; [U2]::keybd_event($vk, $sc, 2, [IntPtr]::Zero); exit 0
   }
+  "tabclick" {
+    $vk = [byte]9; $sc = [byte][U2]::MapVirtualKey($vk, 0)
+    [U2]::keybd_event($vk, $sc, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 700
+    [U2]::SetCursorPos($x, $y); Start-Sleep -Milliseconds 200; [U2]::mouse_event(2, 0, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 60; [U2]::mouse_event(4, 0, 0, 0, [IntPtr]::Zero)
+    Start-Sleep -Milliseconds $ms; if ($out) { Shot $out; "shot $out" }; [U2]::keybd_event($vk, $sc, 2, [IntPtr]::Zero); exit 0
+  }
   "text" { [System.Windows.Forms.SendKeys]::SendWait($text) }
   "shot" { }
 }

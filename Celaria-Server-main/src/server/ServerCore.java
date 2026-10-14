@@ -769,6 +769,20 @@ public class ServerCore {
 			boolean warmup = getGameState().isTimeAttackWarmup();
 			boolean pending = getGameState().isTimeAttackWarmupPending();
 			messages.add("CUPWU " + (warmup || pending ? 1 : 0) + " 1 1 " + (warmup ? getGameState().getRemainingRoundMS() : -1));
+			// observers listed by the mod (title of the cup ranking, bottom left corner)
+			StringBuilder spec = new StringBuilder("\u0001CUPSPEC ");
+			boolean first = true;
+			for (Player p : players.values()) {
+				String name = p.getPlayerProfileData().getPlayerName();
+				if (getGameState().getTimeAttackMod().isObserver(p.getID()) && spec.length() + name.length() < 240) {
+					if (first == false) {
+						spec.append('\u0002');
+					}
+					spec.append(name);
+					first = false;
+				}
+			}
+			messages.add(spec.toString());
 		}
 		for (Player p : modPlayers()) {
 			for (String m : messages) {
