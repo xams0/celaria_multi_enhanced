@@ -19,6 +19,10 @@ final class PatchNotesPage extends JPanel {
 	}
 
 	private static final Version[] VERSIONS = {
+			new Version("2.4.3", "14/10/2026",
+					new Section("Spectateur", "Spectator",
+							new Item("Vue 3e personne : le modèle et le nom du joueur suivi ne sont plus dédoublés (la caméra suit maintenant la position affichée du joueur, à la même heure que les modèles et les noms).",
+									"Third person view: the model and the name of the followed player are no longer doubled (the camera now follows the displayed position of the player, at the same time as the models and the names)."))),
 			new Version("2.4.2", "14/10/2026",
 					new Section("Spectateur", "Spectator",
 							new Item("Les noms des joueurs restent affichés tout le temps (ils disparaissaient au bout de quelques secondes : le jeu mesurait la distance depuis la position de votre joueur).",

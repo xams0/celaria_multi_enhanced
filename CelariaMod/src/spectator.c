@@ -674,6 +674,8 @@ static void update_once(void *self, void *other) {
 static GmlScript orig_refresh_camera_matrices;
 static RValue *__cdecl hook_refresh_camera_matrices(void *self, void *other, RValue *result, int argc, RValue **args) {
 	if (mod_active() == 0) return orig_refresh_camera_matrices(self, other, result, argc, args);
+	// the other players at their interpolated position first: the spectator camera follows the drawn model
+	prediction_interpolate_begin(self, other);
 	update_once(self, other);
 	if (spectating == 0) return orig_refresh_camera_matrices(self, other, result, argc, args);
 	spectator_camera_begin();

@@ -144,12 +144,24 @@ static double dist3(const double *a, const double *b) {
 	return sqrt(dx * dx + dy * dy + dz * dz);
 }
 
+// local time of the frame: the same for every position read during a frame (camera of the spectator, models, names)
+static double frame_time(void) {
+	static unsigned frame = (unsigned)-1;
+	static double time;
+	if (frame != g_frame) {
+		frame = g_frame;
+		time = clock_local_ms();
+	}
+	return time;
+}
+
 // state of a player at the playout time (now - delay); 0 if unknown
 static int track_sample(int id, Sample *out) {
 	if (id < 0 || id > 255) return 0;
 	Track *t = &tracks[id];
-	if (t->count == 0 || clock_local_ms() - t->last_arrival > 1500) return 0;
-	double key = clock_local_ms() + t->offset - display_delay;
+	double now = frame_time();
+	if (t->count == 0 || now - t->last_arrival > 1500) return 0;
+	double key = now + t->offset - display_delay;
 	const Sample *newer = &t->s[(t->head + SAMPLES - 1) % SAMPLES];
 	if (key >= newer->key || t->count == 1) {
 		*out = *newer;
