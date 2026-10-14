@@ -96,6 +96,9 @@ static double target_lost_since;// the followed player stopped racing (local ms)
 static int finish_screen_closed;
 static char target_name[64];
 int g_in_timer_draw;
+
+// the local player watches another player (or the free camera)
+int spectator_active(void) { return spectating; }
 static unsigned timer_drawn_frame;// last frame where the game drew its timer
 
 static double eye_height = 2.3;// eye of the local player above its position (measured), used for the other players

@@ -7,7 +7,7 @@
 // With the mod, the server adds to its position packets, for every other player: his position in 32 bit floats (as
 // sent by his game), the race time of this position (time stamp) and his camera (direction, up vector, eye position
 // relative to the player). The mod keeps these samples and draws every other player at the position interpolated a
-// little in the past (DISPLAY_DELAY_MS) on a playout clock aligned on the time stamps: no extrapolation, no network
+// little in the past (RACE_DELAY_MS / SPECTATOR_DELAY_MS) on a playout clock aligned on the time stamps: no extrapolation, no network
 // jitter. The positions are computed at every frame (the camera of the local player is interpolated at every frame).
 //
 // Packet of the mod (client -> server, after the 29 bytes of the game): "R" + u32 race time (ms) ("N" when the timer
@@ -49,7 +49,25 @@
 #define EXTENSION_SIZE 20
 #define ENTRY_SIZE 33
 
-#define DISPLAY_DELAY_MS 45.0// samples every 20 ms (sent every 2 steps) + relay of the server (60 Hz) + jitter
+// Delay of the display: samples every 20 ms (sent every 2 steps) + relay of the server (60 Hz) + jitter.
+// Racing: short delay (the opponents are shown closer to their real position, ~60 cm behind at full speed); spectating:
+// longer delay (the followed player is never extrapolated). The delay changes progressively (no jump).
+#define RACE_DELAY_MS 28.0
+#define SPECTATOR_DELAY_MS 45.0
+static double display_delay = RACE_DELAY_MS;
+
+// once per frame: the delay follows the state of the local player (racing / spectating), 20 ms per second
+static void update_display_delay(void) {
+	static double last;
+	double now = clock_local_ms();
+	double dt = last > 0 ? now - last : 0;
+	last = now;
+	if (dt > 100) dt = 100;
+	double target = spectator_active() ? SPECTATOR_DELAY_MS : RACE_DELAY_MS;
+	double step = dt * 0.02;
+	if (display_delay < target) display_delay = display_delay + step > target ? target : display_delay + step;
+	else if (display_delay > target) display_delay = display_delay - step < target ? target : display_delay - step;
+}
 #define MAX_EXTRAPOLATION_MS 60.0// packets lost: the last movement continues a little
 #define TELEPORT_DISTANCE 6.0// larger jumps between two samples (respawn) are not interpolated
 #define SAMPLES 32
@@ -131,7 +149,7 @@ static int track_sample(int id, Sample *out) {
 	if (id < 0 || id > 255) return 0;
 	Track *t = &tracks[id];
 	if (t->count == 0 || clock_local_ms() - t->last_arrival > 1500) return 0;
-	double key = clock_local_ms() + t->offset - DISPLAY_DELAY_MS;
+	double key = clock_local_ms() + t->offset - display_delay;
 	const Sample *newer = &t->s[(t->head + SAMPLES - 1) % SAMPLES];
 	if (key >= newer->key || t->count == 1) {
 		*out = *newer;
@@ -334,6 +352,7 @@ static void set_model(void *inst, const double pos[3]) {
 // at every frame, before the drawing: every other player at his interpolated position
 void prediction_interpolate_begin(void *self, void *other) {
 	if (active() == 0) return;
+	update_display_delay();
 	uint8_t iterator[1024];
 	void *s = self, *o = other;
 	if (YY_WITH_NEW(iterator, &s, &o, OBJ_NETWORK_PLAYER) > 0) {

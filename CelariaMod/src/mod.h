@@ -40,6 +40,7 @@ extern int g_records_tab;
 // spectator.c: frame counter (incremented once per drawn frame)
 extern unsigned g_frame;
 void spectator_round_starts(void);
+int spectator_active(void);
 // gap with the first player in the middle of the screen: local player (checkpoint/finish) or followed player
 void spectator_local_checkpoint(int index, long ms);
 void spectator_player_checkpoint(int id, int index, long ms);

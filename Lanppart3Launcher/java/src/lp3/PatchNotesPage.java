@@ -19,6 +19,10 @@ final class PatchNotesPage extends JPanel {
 	}
 
 	private static final Version[] VERSIONS = {
+			new Version("2.3.1", "14/10/2026",
+					new Section("Positions des joueurs", "Positions of the players",
+							new Item("En course, les adversaires sont affichés plus près de leur position réelle (retard ≈ 28 ms, ~60 cm à pleine vitesse au lieu de ~1 m). En spectateur, le retard reste de 45 ms pour une restitution parfaite.",
+									"While racing, the opponents are shown closer to their real position (delay ≈ 28 ms, ~60 cm at full speed instead of ~1 m). While spectating, the delay stays at 45 ms for a perfect restitution."))),
 			new Version("2.3.0", "14/10/2026",
 					new Section("Positions des joueurs", "Positions of the players",
 							new Item("Positions exactes : le serveur d'origine arrondissait les positions des autres joueurs à 10 cm (vers le bas : joueurs dans le sol). Le serveur Lanppart3 envoie maintenant les positions exactes aux joueurs qui ont le mod.",
