@@ -249,6 +249,13 @@ public class UdpReciever implements Runnable{
 	 */
 	private void readLook(Player p, PlayerRuntimeUdpData playerData, byte[] data, int length) {
 		int o = POSITION_PACKET_SIZE + 5;
+		// mod 3: "R"/"N" + u32 race time + camera (15 bytes)
+		if (p.getModVersion() >= 3 && length >= o + 15 && (data[POSITION_PACKET_SIZE] == (byte) 0x52 || data[POSITION_PACKET_SIZE] == (byte) 0x4E)) {
+			playerData.setCamera(java.util.Arrays.copyOfRange(data, o, o + 15));
+			playerData.setLook(-1, 0);
+			return;
+		}
+		playerData.setCamera(null);
 		if (p.getModVersion() > 0 && length >= o + 4 && (data[POSITION_PACKET_SIZE] == (byte) 0x52 || data[POSITION_PACKET_SIZE] == (byte) 0x4E)) {
 			int yaw = (data[o] & 0xFF) | ((data[o + 1] & 0xFF) << 8);
 			int pitch = (short) ((data[o + 2] & 0xFF) | ((data[o + 3] & 0xFF) << 8));

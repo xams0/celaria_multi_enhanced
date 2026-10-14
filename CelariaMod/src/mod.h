@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include "yyc.h"
 
-#define MOD_VERSION 2
+#define MOD_VERSION 3
 
 // first bytes of every YYC script: push ebp; mov ebp,esp; push ebx; push edi
 static const uint8_t PROLOGUE[] = { 0x55, 0x89, 0xE5, 0x53, 0x57 };
@@ -33,6 +33,8 @@ void lanbrowser_update(void *self, void *other);
 void prediction_reset(void);
 // camera of another player sent by its mod (world yaw / pitch, degrees); 0 if unknown
 int prediction_look(int id, double *yaw, double *pitch);
+// camera of another player at the displayed time: eye (world), unit direction, up vector; 0 if unknown
+int prediction_camera(int id, double eye[3], double dir[3], double up[3]);
 int prediction_handle_message(const char *text);
 extern int g_records_tab;
 // spectator.c: frame counter (incremented once per drawn frame)

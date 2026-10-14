@@ -11,6 +11,15 @@ public class LeaderboardEntry implements Comparable<LeaderboardEntry>{
 
 	byte badge;
 	private boolean timeSet;
+	private int placeOverride = -1;// cup: place shown by the client (each part of the leaderboard is numbered from 1)
+
+	public int getPlaceOverride(){
+		return placeOverride;
+	}
+
+	public void setPlaceOverride(int place){
+		this.placeOverride = place;
+	}
 	
 	public LeaderboardEntry(int playerID,String playerName,byte badge){
 		this.time = 0;

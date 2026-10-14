@@ -19,6 +19,21 @@ final class PatchNotesPage extends JPanel {
 	}
 
 	private static final Version[] VERSIONS = {
+			new Version("2.3.0", "14/10/2026",
+					new Section("Positions des joueurs", "Positions of the players",
+							new Item("Positions exactes : le serveur d'origine arrondissait les positions des autres joueurs à 10 cm (vers le bas : joueurs dans le sol). Le serveur Lanppart3 envoie maintenant les positions exactes aux joueurs qui ont le mod.",
+									"Exact positions: the original server rounded the positions of the other players to 10 cm (downwards: players in the floor). The Lanppart3 server now sends the exact positions to the players with the mod."),
+							new Item("Plus d'extrapolation : les autres joueurs sont affichés à leurs positions réelles, interpolées à chaque image avec un léger retard (≈ 45 ms). Plus de passages sous le sol ou dans les murs, sauts et wallrides fidèles.",
+									"No more extrapolation: the other players are shown at their real positions, interpolated at every frame with a small delay (≈ 45 ms). No more going through the floor or the walls, faithful jumps and wall runs."),
+							new Item("Positions envoyées toutes les 20 ms (au lieu de 30).", "Positions sent every 20 ms (instead of 30).")),
+					new Section("Spectateur", "Spectator",
+							new Item("Vue 1re personne : la vraie caméra du joueur suivi (roulades, glissades, inclinaison des wallrides, hauteur des yeux).",
+									"First person view: the real camera of the followed player (rolls, slides, tilt of the wall runs, eye height)."),
+							new Item("Classement aux checkpoints en haut à gauche, sous la manche / le warmup.", "Checkpoint ranking at the top left, below the round / warmup.")),
+					new Section("Coupe", "Cup",
+							new Item("Classement en deux parties : la manche en cours, puis le classement de la coupe.", "Leaderboard in two parts: the current round, then the cup ranking."),
+							new Item("Plus de bouton « Restart Map » une fois son temps validé (la manche continue pour les autres).",
+									"No \"Restart Map\" button any more once your time is validated (the round goes on for the others)."))),
 			new Version("2.2.0", "14/10/2026",
 					new Section("Launcher", "Launcher",
 							new Item("Mise à jour obligatoire : au démarrage, si une nouvelle version existe, une fenêtre propose de l'installer (ou de quitter) ; le launcher n'est pas utilisable sans la mise à jour. Tous les joueurs de la LAN ont ainsi la même version.",

@@ -242,7 +242,7 @@ public class ServerConfig {
 	 * with less delay.
 	 */
 	public int getClientUdpRefreshRate() {
-		return 3;// both modes: LAN servers, the spectator view of the mod follows the other players closely
+		return 2;// both modes: LAN servers, positions every 20 ms (the mod interpolates them)
 	}
 
 	//TCP and UDP use always the same port (for simplicity purposes)

@@ -102,6 +102,7 @@ static double eye_height = 2.3;// eye of the local player above its position (me
 static double free_pos[3];
 static int free_initialised;
 static double cam_eye[3], cam_dir[3];// spectator camera: eye, unit direction
+static double cam_up[3] = { 0, 0, 1 };// up vector (tilted in the wall runs of the followed player)
 static double cam_yaw, cam_pitch;// orbit (third person) / free camera orientation, degrees
 static int orbit_initialised;
 static double not_racing_since;// the local player stopped racing (local ms), 0 = racing
@@ -444,6 +445,8 @@ static void update(void *self, void *other) {
 			cam_dir[k] = d[k];
 		}
 		target_name[0] = 0;
+		cam_up[0] = cam_up[1] = 0;
+		cam_up[2] = 1;
 		return;
 	}
 
@@ -468,13 +471,21 @@ static void update(void *self, void *other) {
 	}
 	double yaw, pitch;
 	target_look(t, &yaw, &pitch);
+	cam_up[0] = 0;
+	cam_up[1] = 0;
+	cam_up[2] = 1;
 	if (view == VIEW_FIRST_PERSON) {
 		cam_yaw = yaw;// the third person view starts behind the player
 		cam_pitch = pitch;
-		cam_eye[0] = t->x;
-		cam_eye[1] = t->y;
-		cam_eye[2] = t->z + eye_height;
-		direction(yaw, pitch, cam_dir);
+		// the camera of the followed player as his game computes it (rolls, slides, wall runs): eye, direction, up vector
+		if (prediction_camera(t->id, cam_eye, cam_dir, cam_up) == 0) {
+			cam_eye[0] = t->x;
+			cam_eye[1] = t->y;
+			cam_eye[2] = t->z + eye_height;
+			direction(yaw, pitch, cam_dir);
+			cam_up[0] = cam_up[1] = 0;
+			cam_up[2] = 1;
+		}
 	} else {
 		if (orbit_initialised == 0) {
 			cam_yaw = yaw;
@@ -566,7 +577,7 @@ static RValue *render_scene(void *self, void *other, RValue *result, int argc, R
 	YY_VAR_GET(OBJ_CAMERA, VAR_PRE_VALUES, ARRAY_NONE, &pre);
 	int pre_instance = YY_GET_INT32(&pre);
 	yy_clear(&pre);
-	double values[12] = { cam_eye[0], cam_eye[1], cam_eye[2], cam_dir[0], cam_dir[1], cam_dir[2], 0, 0, 1,
+	double values[12] = { cam_eye[0], cam_eye[1], cam_eye[2], cam_dir[0], cam_dir[1], cam_dir[2], cam_up[0], cam_up[1], cam_up[2],
 		-cam_yaw, asin(cam_dir[2] > 1 ? 1 : cam_dir[2] < -1 ? -1 : cam_dir[2]) * 180.0 / M_PI, 0 };
 	double saved[2][12];
 	for (int k = 0; k < 12; k++) {
@@ -791,8 +802,12 @@ static void draw_checkpoint_ranking(void *self, void *other, double w, double h)
 	float col_where = col_name + text_width(self, other, "WWWWWWWWWWW") * fs;
 	float col_time = col_where + text_width(self, other, "CP00 ") * fs;
 	float width = col_time + text_width(self, other, "+00:00:000") * fs + 16;
-	float right = (float)w - 12, bottom = (float)(h * 0.885);
-	float top = bottom - line_h * (float)count - 8, left = right - width;
+	// top left, below the round / warmup boxes (and the hint of the spectator)
+	float th1 = text_height(self, other);
+	float top = 26 + th1 * 1.6f + (spectating ? th1 + 14 : 0);
+	float left = 10, right = left + width, bottom = top + line_h * (float)count + 8;
+	(void)w;
+	(void)h;
 	hud_rect(left, top, right, bottom, COLOUR_BLACK, 0.55f);
 	hud_font(0, 1);
 	for (int i = 0; i < count; i++) {
@@ -861,6 +876,10 @@ static RValue *__cdecl hook_create_button_left_bar(void *self, void *other, RVal
 		const char *text = yy_string(args[2]);
 		if (text && strcmp(text, "Sound") == 0) button_y_sound = yy_to_real(args[1]);
 		if (text && strcmp(text, "Controls") == 0) button_y_controls = yy_to_real(args[1]);
+		// cup: the time of the round is validated, the player waits for the others: no "Restart Map" (= DNF); the button
+		// is created out of the screen (the game uses the instance it returns)
+		if (text && strcmp(text, "Restart Map") == 0 && cup_menu_active() && cup_mode() && (args[1]->kind & 0xffffff) == KIND_REAL)
+			args[1]->real = -100000;
 		if (text && strcmp(text, "Reset Run") == 0 && cup_menu_active()) {
 			yy_set_string(args[2], cup_state(cup_local_id()) == 'V' ? "Play" : "Spectator");
 		}

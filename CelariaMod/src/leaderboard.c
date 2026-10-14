@@ -85,7 +85,14 @@ static void frame(float x1, float y1, float x2, float y2, int colour) {
 		((void(__cdecl *)(float, float, float, float, int))ADDR(DIRECT_DRAW_RECTANGLE))(x1 + i, y1 + i, x2 - i, y2 - i, 1);
 }
 
+#define VAR_ENTRY_PLACE_STRING 527
+
 static void __cdecl hook_entry_draw(void *self, void *other) {
+	// title of a part of the leaderboard ("=== ROUND 2/5 ===", "=== CUP RANKING ==="): no place number
+	if (self && cup_server()) {
+		const char *n = yy_string(yy_self_var(self, VAR_ENTRY_USERNAME));
+		if (n && strncmp(n, "===", 3) == 0) yy_set_string(yy_self_var(self, VAR_ENTRY_PLACE_STRING), "");
+	}
 	orig_entry_draw(self, other);
 	if (self == NULL || cup_server() == 0) return;
 	const char *name = yy_string(yy_self_var(self, VAR_ENTRY_USERNAME));

@@ -108,7 +108,7 @@ public class PlayerProcessor implements Runnable {
 		String playerName = entry.getPlayername();
 		int playerID = entry.getPlayerID();
 
-		BufferConverter.buffer_write_u8(message, place);// place
+		BufferConverter.buffer_write_u8(message, entry.getPlaceOverride() >= 0 ? entry.getPlaceOverride() : place);// place
 		BufferConverter.buffer_write_u8(message, playerID);// playerID
 		BufferConverter.buffer_write_u8(message, playerName.length());// length (max 255)
 		BufferConverter.buffer_write_chars_u8(message, playerName);// string
@@ -145,6 +145,7 @@ public class PlayerProcessor implements Runnable {
 			} else {
 				leaderboard[i] = new LeaderboardEntry(e.playerID, name, e.badge);
 			}
+			leaderboard[i].setPlaceOverride(e.place);
 		}
 		return leaderboard;
 	}

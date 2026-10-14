@@ -140,6 +140,8 @@ public class BroadcasterUDP implements Runnable{
 						boolean headerInitialised = false;
 						boolean raceTimes = player.getModVersion() > 0;// race time and camera of the positions (mod), both modes
 						java.util.List<long[]> packetRaceTimes = new java.util.ArrayList<long[]>();
+						boolean exactPositions = player.getModVersion() >= 3;// mod 3: exact positions, race times and cameras
+						java.util.List<byte[]> packetExact = new java.util.ArrayList<byte[]>();
 
 						//packet
 						ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
@@ -229,7 +231,9 @@ public class BroadcasterUDP implements Runnable{
 													StreamConverter.buffer_write_u8(output, (int)((requestedPlayerData.getRotationZ()/360f)*255f));
 													StreamConverter.buffer_write_u8(output, requestedPlayerData.getAnimationID());
 													StreamConverter.buffer_write_u8(output, (int)(requestedPlayerData.getAnimationStep()*255f));
-													if (raceTimes && (requestedPlayerData.getRaceTimeMS() >= 0 || requestedPlayerData.getLookYaw() >= 0)) {
+													if (exactPositions) {
+														packetExact.add(exactEntry(playerKey.intValue(), requestedPlayerData));
+													} else if (raceTimes && (requestedPlayerData.getRaceTimeMS() >= 0 || requestedPlayerData.getLookYaw() >= 0)) {
 																												packetRaceTimes.add(new long[] { playerKey.intValue(), requestedPlayerData.getRaceTimeMS(), requestedPlayerData.getLookYaw(), requestedPlayerData.getLookPitch() });
 													}
 
@@ -240,6 +244,7 @@ public class BroadcasterUDP implements Runnable{
 
 														StreamConverter.buffer_write_u8(output,0);//no additional information is available (client stops reading this packet)
 														writeRaceTimes(output, packetRaceTimes);
+														writeExact(output, packetExact);
 
 														//send packet
 														output.flush();
@@ -275,6 +280,7 @@ public class BroadcasterUDP implements Runnable{
 
 									StreamConverter.buffer_write_u8(output,0);//no additional information is available (client stops reading this packet)
 									writeRaceTimes(output, packetRaceTimes);
+									writeExact(output, packetExact);
 									output.flush();
 									byte[] bytes = byteOut.toByteArray();
 									DatagramPacket packet = new DatagramPacket(bytes,bytes.length,address,udpPort);//send packet to source
@@ -353,6 +359,40 @@ public class BroadcasterUDP implements Runnable{
 	 	 * clients without the mod). Read from the end of the packet: [id u8, race time u32, yaw u16, pitch s16] * count, count u8,
 	 * "SX" (yaw 0xFFFF = unknown).
 	 */
+	/**
+	 * Mod 3: exact state of a player for the clients with the mod: [id u8, flags u8 (1 = race time, 2 = camera),
+	 * u32 race time, f32 x, f32 y, f32 z, camera 15 bytes] (33 bytes). The position of the game packet is compressed to
+	 * 10 cm; the mod interpolates the exact positions on the race times.
+	 */
+	private static byte[] exactEntry(int id, PlayerRuntimeUdpData d) {
+		java.nio.ByteBuffer b = java.nio.ByteBuffer.allocate(33).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+		byte[] camera = d.getCamera();
+		b.put((byte) id);
+		b.put((byte) ((d.getRaceTimeMS() >= 0 ? 1 : 0) | (camera != null ? 2 : 0)));
+		b.putInt((int) Math.max(0, d.getRaceTimeMS()));
+		b.putFloat((float) d.getX());
+		b.putFloat((float) d.getY());
+		b.putFloat((float) d.getZ());
+		if (camera != null) {
+			b.put(camera, 0, 15);
+		}
+		return b.array();
+	}
+
+	/** entries, count u8, "SZ" (read from the end of the packet by the mod) */
+	private static void writeExact(DataOutputStream output, java.util.List<byte[]> entries) throws IOException {
+		if (entries.isEmpty()) {
+			return;
+		}
+		for (byte[] e : entries) {
+			output.write(e);
+		}
+		StreamConverter.buffer_write_u8(output, entries.size());
+		StreamConverter.buffer_write_u8(output, 0x53);// S
+		StreamConverter.buffer_write_u8(output, 0x5A);// Z
+		entries.clear();
+	}
+
 	private static void writeRaceTimes(DataOutputStream output, java.util.List<long[]> raceTimes) throws IOException {
 		if (raceTimes.isEmpty()) {
 			return;

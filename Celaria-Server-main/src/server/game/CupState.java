@@ -216,6 +216,12 @@ public class CupState {
 		public final boolean timeSet;
 		public final long time;// precise time (ms)
 		public final long officialTime;// official time (ms, multiple of 10): displayed by the clients without the mod
+		public int place = -1;// place shown in front of the entry (each part of the leaderboard starts at 1), -1 = position in the list
+
+		CupLeaderboardEntry at(int place) {
+			this.place = place;
+			return this;
+		}
 
 		CupLeaderboardEntry(int playerID, String displayName, byte badge, boolean timeSet, long time, long officialTime) {
 			this.playerID = playerID;
@@ -840,40 +846,42 @@ public class CupState {
 	}
 
 	/**
-	 * Builds the leaderboard displayed by the clients.
-	 * While a round is running: finishers of the round (by time) followed by the other players (by cup ranking).
-	 * Between rounds: cup ranking with the points won in the last round.
+	 * Builds the leaderboard displayed by the clients, in two parts one above the other:
+	 * - "=== ROUND ... ===": the round (running: finishers by time then the other participants; between rounds: results of
+	 *   the last round with the points won);
+	 * - "=== CUP RANKING ===": the cup ranking (points, FINALIST, WINNER), then the observers.
+	 * The places are numbered from 1 in each part; the title lines have no place (player id 255, hidden by the mod).
 	 */
 	public synchronized List<CupLeaderboardEntry> buildLeaderboard() {
 		List<CupLeaderboardEntry> entries = new ArrayList<CupLeaderboardEntry>();
 		List<CupPlayer> standings = getStandings();
-
+		String roundTitle = warmupRound || (roundRunning == false && isWarmup()) ? "=== WARMUP ===" : "=== ROUND " + Math.max(1, roundRunning ? roundsPlayedOnMap + 1 : roundsPlayedOnMap) + "/" + settings.roundsPerMap + " ===";
+		entries.add(title(roundTitle));
+		int place = 1;
+		for (RoundFinish f : roundFinishes) {
+			if (f.player.connected) {
+				String text = f.player.name + (roundRunning == false && f.player.lastRoundPoints > 0 ? " (+" + f.player.lastRoundPoints + ")" : "");
+				entries.add(new CupLeaderboardEntry(f.player.playerID, text, f.player.badge, true, f.effectivePreciseTime, f.effectiveTime).at(place++));
+			}
+		}
 		if (roundRunning) {
-			for (RoundFinish f : roundFinishes) {
-				if (f.player.connected) {
-					entries.add(new CupLeaderboardEntry(f.player.playerID, f.player.getStatusText() + " | " + f.player.name, f.player.badge, true, f.effectivePreciseTime, f.effectiveTime));
-				}
-			}
 			for (CupPlayer p : standings) {
-				if (findFinish(p.playerID) == null) {
-					String text = p.getStatusText();
-					if (roundEliminated.contains(p.playerID)) {
-						text += " (out)";
-					} else if (roundStartTimes.containsKey(p.playerID) == false) {
-						text += " (spec)";
-					}
-					entries.add(new CupLeaderboardEntry(p.playerID, text + " | " + p.name, p.badge, false, 0, 0));
+				if (findFinish(p.playerID) == null && roundStartTimes.containsKey(p.playerID)) {
+					String text = p.name + (roundEliminated.contains(p.playerID) ? " (DNF)" : "");
+					entries.add(new CupLeaderboardEntry(p.playerID, text, p.badge, false, 0, 0).at(place++));
 				}
 			}
-		} else {
-			for (CupPlayer p : standings) {
-				String text = p.getStatusText();
-				if (p.lastRoundPoints > 0) {
-					text += " (+" + p.lastRoundPoints + ")";
-				}
-				RoundFinish f = findFinish(p.playerID);
-				entries.add(new CupLeaderboardEntry(p.playerID, text + " | " + p.name, p.badge, f != null, f != null ? f.effectivePreciseTime : 0, f != null ? f.effectiveTime : 0));
+		}
+		entries.add(title("=== CUP RANKING ==="));
+		place = 1;
+		for (CupPlayer p : standings) {
+			String text = p.getStatusText();
+			if (roundRunning == false && p.lastRoundPoints > 0) {
+				text += " (+" + p.lastRoundPoints + ")";
+			} else if (roundRunning && roundStartTimes.containsKey(p.playerID) == false) {
+				text += " (spec)";
 			}
+			entries.add(new CupLeaderboardEntry(p.playerID, text + " | " + p.name, p.badge, false, 0, 0).at(place++));
 		}
 		// observers (casters): out of the competition, below the players
 		List<CupPlayer> observers = new ArrayList<CupPlayer>();
@@ -889,8 +897,12 @@ public class CupState {
 			}
 		});
 		for (CupPlayer p : observers) {
-			entries.add(new CupLeaderboardEntry(p.playerID, "SPECTATE | " + p.name, p.badge, false, 0, 0));
+			entries.add(new CupLeaderboardEntry(p.playerID, "SPECTATE | " + p.name, p.badge, false, 0, 0).at(place++));
 		}
 		return entries;
+	}
+
+	private static CupLeaderboardEntry title(String text) {
+		return new CupLeaderboardEntry(255, text, (byte) 0, false, 0, 0).at(0);
 	}
 }

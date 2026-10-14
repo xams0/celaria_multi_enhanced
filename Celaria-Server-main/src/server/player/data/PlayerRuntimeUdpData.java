@@ -26,6 +26,15 @@ public class PlayerRuntimeUdpData {
 		private long raceTimeMS = -1;// cup mod: race time (ms since the start of the round) of this position, -1 = unknown
 	private int lookYaw = -1;// cup mod: camera of the player (yaw 0..65535 = 0..360 degrees, pitch in 1/100 degree), -1 = unknown
 	private int lookPitch;
+	private byte[] camera;// mod 3: camera of the player (direction s16 x3, up s8 x3, eye offset s16 x3 = 15 bytes), null = unknown
+
+	public byte[] getCamera(){
+		return camera;
+	}
+
+	public void setCamera(byte[] camera){
+		this.camera = camera;
+	}
 	
 	public PlayerRuntimeUdpData(){
 		
@@ -68,6 +77,7 @@ public class PlayerRuntimeUdpData {
 		this.raceTimeMS = source.raceTimeMS;
 		this.lookYaw = source.lookYaw;
 		this.lookPitch = source.lookPitch;
+		this.camera = source.camera;
 	
 	}
 	
