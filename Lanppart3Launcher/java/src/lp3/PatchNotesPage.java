@@ -19,6 +19,11 @@ final class PatchNotesPage extends JPanel {
 	}
 
 	private static final Version[] VERSIONS = {
+			new Version("2.2.0", "14/10/2026",
+					new Section("Launcher", "Launcher",
+							new Item("Mise à jour obligatoire : au démarrage, si une nouvelle version existe, une fenêtre propose de l'installer (ou de quitter) ; le launcher n'est pas utilisable sans la mise à jour. Tous les joueurs de la LAN ont ainsi la même version.",
+									"Mandatory update: at start, if a new version exists, a window offers to install it (or to quit); the launcher can't be used without the update. Every player of the LAN has the same version."),
+							new Item("Sans accès à Internet, le launcher s'ouvre normalement.", "Without Internet access, the launcher opens normally."))),
 			new Version("2.1.0", "14/10/2026",
 					new Section("Course", "Racing",
 							new Item("Les adversaires proches ne saccadent plus : ils sont dessinés entre deux pas de simulation, comme son propre personnage.",

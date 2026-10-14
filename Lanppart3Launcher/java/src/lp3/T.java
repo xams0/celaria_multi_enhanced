@@ -238,6 +238,14 @@ public final class T {
 		e("Coché : warmup d'une durée (entraînement libre). Sinon : en manches", "Checked: warmup with a duration (free practice). Else: in rounds");
 		e("Durée du warmup (s)", "Warmup duration (s)");
 		e("Warmup au temps (0 = pas de warmup)", "Warmup with a duration (0 = no warmup)");
+		e("INSTALLER LA MISE À JOUR", "INSTALL THE UPDATE");
+		e("Mise à jour obligatoire", "Mandatory update");
+		e("MISE À JOUR OBLIGATOIRE", "MANDATORY UPDATE");
+		e("Version %s disponible (installée : %s)", "Version %s available (installed: %s)");
+		e("Le launcher doit être mis à jour pour être utilisé (tous les joueurs de la LAN doivent avoir la même version).",
+				"The launcher must be updated to be used (every player of the LAN must have the same version).");
+		e("RÉESSAYER", "RETRY");
+		e("Celaria Lanppart3 : recherche de mise à jour...", "Celaria Lanppart3: checking for updates...");
 		// patch notes page
 		e("Patch notes", "Patch notes");
 		e("Vérifier les mises à jour", "Check for updates");

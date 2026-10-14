@@ -27,11 +27,26 @@ public final class Main {
 		Env.init();
 		T.init();
 		Updater.cleanup();
-		SwingUtilities.invokeLater(() -> {
+		// mandatory update: GitHub is checked before the launcher opens (without Internet, e.g. a LAN party without access
+		// to the Internet, the launcher opens normally)
+		JWindow[] checking = new JWindow[1];
+		SwingUtilities.invokeAndWait(() -> {
 			Theme.install();
+			checking[0] = UpdateDialog.checking();
+			checking[0].setVisible(true);
+		});
+		Updater.Release release = Updater.latest();
+		boolean update = release != null && Updater.newer(release.version(), Updater.currentVersion());
+		SwingUtilities.invokeLater(() -> {
+			checking[0].dispose();
+			if (update) {
+				UpdateDialog d = new UpdateDialog(null, release, null);
+				d.setAlwaysOnTop(true);
+				d.setVisible(true);// modal: install (restart) or quit
+				return;
+			}
 			LauncherFrame f = new LauncherFrame();
 			f.setVisible(true);
-			f.checkUpdate(false);
 			// started by Celaria Lanppart3.exe (which exits): Windows may leave the new window behind, it is brought to the front
 			f.setAlwaysOnTop(true);
 			f.toFront();

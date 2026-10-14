@@ -139,9 +139,7 @@ public final class LauncherFrame extends JFrame {
 					available = r;
 					updateButton.setText(T.f("Mise à jour %s disponible", "v" + r.version()));
 					updateButton.setVisible(true);
-					if (manual) {
-						installUpdate();
-					}
+					installUpdate();// mandatory
 				} else if (manual) {
 					Dialogs.message(this, T.t("Mise à jour"), T.f("Le launcher est à jour (v%s).", Updater.currentVersion()), false);
 				}
@@ -155,31 +153,17 @@ public final class LauncherFrame extends JFrame {
 		return s.length() > 600 ? s.substring(0, 600) + "..." : s;
 	}
 
+	/** mandatory update window (install or quit); the server is stopped before the restart */
 	private void installUpdate() {
 		Updater.Release r = available;
 		if (r == null) {
 			return;
 		}
-		String text = T.f("Nouvelle version %s (actuelle : %s).\n\n%s\n\nInstaller maintenant ? Le launcher redémarrera.", "v" + r.version(),
-				"v" + Updater.currentVersion(), shortNotes(r.notes()));
-		if (Dialogs.confirm(this, T.t("Installer la mise à jour"), text) == false) {
-			return;
-		}
-		updateButton.setEnabled(false);
-		new Thread(() -> {
-			String error = Updater.install(r, pct -> status(T.f("Téléchargement de la mise à jour : %d %%", pct)));
-			if (error != null) {
-				error(error);
-				SwingUtilities.invokeLater(() -> updateButton.setEnabled(true));
-				return;
-			}
-			status(T.t("Mise à jour installée : redémarrage..."));
+		new UpdateDialog(this, r, () -> {
 			if (server.running()) {
 				server.stopServer(true);
 			}
-			Updater.restart();
-			System.exit(0);
-		}, "update").start();
+		}).setVisible(true);
 	}
 
 	private static JComponent wrap(JComponent page) {
