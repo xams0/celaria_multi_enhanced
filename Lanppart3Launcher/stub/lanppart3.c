@@ -161,7 +161,13 @@ static int extract(const wchar_t *self, wchar_t *target, size_t target_size) {
 	if (GetFileAttributesW(target) != INVALID_FILE_ATTRIBUTES) {
 		wchar_t old_runtime[MAX_PATH];
 		_snwprintf(old_runtime, MAX_PATH, L"%ls\\old_%lu", app, (unsigned long)GetTickCount());
-		if (!MoveFileW(target, old_runtime)) return 9;
+		// the previous launcher may still be closing: a few retries
+		int moved = 0;
+		for (int i = 0; i < 60 && moved == 0; i++) {
+			moved = MoveFileW(target, old_runtime);
+			if (moved == 0) Sleep(250);
+		}
+		if (moved == 0) return 9;
 	}
 	// other versions are removed
 	wchar_t pattern[MAX_PATH];
@@ -265,7 +271,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR args, int show
 	PROCESS_INFORMATION pi;
 	// this exe was started by the user (foreground): the launcher may take the foreground (else its window stays behind)
 	AllowSetForegroundWindow(ASFW_ANY);
-	if (!CreateProcessW(javaw, cmd, NULL, NULL, FALSE, 0, NULL, target, &si, &pi)) {
+	// working folder: the app folder, not the runtime folder (an update replaces it)
+	wchar_t workdir[MAX_PATH];
+	wcsncpy(workdir, target, MAX_PATH - 1);
+	workdir[MAX_PATH - 1] = 0;
+	wchar_t *last = wcsrchr(workdir, L'\\');
+	if (last) *last = 0;
+	if (!CreateProcessW(javaw, cmd, NULL, NULL, FALSE, 0, NULL, workdir, &si, &pi)) {
 		message(L"Impossible de démarrer le launcher (Java).");
 		return 1;
 	}

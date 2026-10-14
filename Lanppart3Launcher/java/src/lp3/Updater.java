@@ -175,7 +175,9 @@ public final class Updater {
 	public static void restart() {
 		File exe = launcherExe();
 		try {
-			new ProcessBuilder("cmd.exe", "/c", "ping -n 3 127.0.0.1 >nul & start \"\" \"" + exe.getAbsolutePath() + "\"").start();
+			// working folder: the folder of the exe (not the runtime folder, which the new version replaces)
+			new ProcessBuilder("cmd.exe", "/c", "ping -n 3 127.0.0.1 >nul & start \"\" \"" + exe.getAbsolutePath() + "\"").directory(exe.getParentFile())
+					.start();
 		} catch (IOException ignored) {
 		}
 	}

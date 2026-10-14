@@ -149,13 +149,19 @@ public final class LauncherFrame extends JFrame {
 		}, "update check").start();
 	}
 
+	/** notes of the release without the markdown marks */
+	private static String shortNotes(String notes) {
+		String s = notes.replace("**", "").replace("__", "").trim();
+		return s.length() > 600 ? s.substring(0, 600) + "..." : s;
+	}
+
 	private void installUpdate() {
 		Updater.Release r = available;
 		if (r == null) {
 			return;
 		}
 		String text = T.f("Nouvelle version %s (actuelle : %s).\n\n%s\n\nInstaller maintenant ? Le launcher redémarrera.", "v" + r.version(),
-				"v" + Updater.currentVersion(), r.notes().length() > 600 ? r.notes().substring(0, 600) + "..." : r.notes());
+				"v" + Updater.currentVersion(), shortNotes(r.notes()));
 		if (Dialogs.confirm(this, T.t("Installer la mise à jour"), text) == false) {
 			return;
 		}

@@ -40,3 +40,18 @@ propose de la retirer (restaure le winExt.dll d'origine).
 
 1. `CelariaMod/build.sh` (mod), `_tools/build_server.sh` (serveur)
 2. `Lanppart3Launcher/build.sh` → `out/Celaria Lanppart3.exe`
+
+## Langues, patch notes, mises à jour
+
+- Français / anglais : boutons FR / EN en bas à gauche (textes dans `T.java`, clé = texte français).
+- Page « Nouveautés / Patch notes » : `PatchNotesPage.java` (à compléter à chaque version).
+- Au démarrage, le launcher lit la dernière Release de https://github.com/xams0/celaria_multi_enhanced (seul le launcher contacte
+  GitHub, jamais le jeu ni le mod). Si elle est plus récente que sa version (`VERSION`), un bouton « Mise à jour disponible »
+  apparaît : l'exe est téléchargé, remplace l'ancien (gardé en `.old` jusqu'au démarrage suivant) et le launcher redémarre.
+
+## Publier une nouvelle version
+
+1. Augmenter `Lanppart3Launcher/VERSION` (ex. `2.0.1`), ajouter les nouveautés dans `PatchNotesPage.java` et `release_notes.md`
+2. `Lanppart3Launcher/build.sh`
+3. `node _tools/release.mjs v2.0.1 "Lanppart3Launcher/out/Celaria Lanppart3.exe" Lanppart3Launcher/release_notes.md`
+   (crée la Release et envoie l'exe avec les identifiants GitHub enregistrés dans Git), puis `git push`.
