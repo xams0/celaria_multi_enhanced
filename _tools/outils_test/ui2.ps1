@@ -42,6 +42,10 @@ switch ($action) {
     $vk = [byte][int]$key; $sc = [byte][U2]::MapVirtualKey($vk, 0)
     [U2]::keybd_event($vk, $sc, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds $ms; [U2]::keybd_event($vk, $sc, 2, [IntPtr]::Zero)
   }
+  "holdshot" {
+    $vk = [byte][int]$key; $sc = [byte][U2]::MapVirtualKey($vk, 0)
+    [U2]::keybd_event($vk, $sc, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds $ms; if ($out) { Shot $out; "shot $out" }; [U2]::keybd_event($vk, $sc, 2, [IntPtr]::Zero); exit 0
+  }
   "text" { [System.Windows.Forms.SendKeys]::SendWait($text) }
   "shot" { }
 }

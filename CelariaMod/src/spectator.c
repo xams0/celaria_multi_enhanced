@@ -797,7 +797,7 @@ static void draw_checkpoint_ranking(void *self, void *other, double w, double h)
 	if (cup_known() == 0) return;
 	CupRankLine lines[10];
 	int highlight_id = spectating && view != VIEW_FREE ? target_id : cup_local_id();
-	int count = cup_build_ranking(lines, 10);
+	int count = cup_build_ranking(lines, 10, highlight_id);
 	if (count == 0) return;
 		const float fs = 1.1f;
 	float line_h = text_height(self, other) * fs + 6;
@@ -817,7 +817,7 @@ static void draw_checkpoint_ranking(void *self, void *other, double w, double h)
 		float y = top + 4 + line_h * ((float)i + 0.5f);
 		int colour = lines[i].id == highlight_id ? COLOUR_YELLOW : COLOUR_WHITE;
 		char pos[8];
-		snprintf(pos, sizeof pos, "%d", i + 1);
+		snprintf(pos, sizeof pos, "%d", lines[i].place);
 		char name[16];
 		snprintf(name, sizeof name, "%.11s", player_name(lines[i].id));
 		hud_text(self, other, left + 8, y, pos, fs, colour);
@@ -1011,6 +1011,7 @@ static RValue *__cdecl hook_draw_gui(void *self, void *other, RValue *result, in
 	RValue on = { 0 };
 	on.real = 1;
 	set_alphablend(self, other, &on);
+	leaderboard_draw_cup(self, other);
 	draw_mod_label(self, other);
 	set_alphablend(self, other, (RValue *)ADDR(CONST_LAST_ALPHABLEND));
 	return result;

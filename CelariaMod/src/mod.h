@@ -65,6 +65,7 @@ double spectator_timer_ms(void);
 // cupstate.c: state of the cup sent by the server
 typedef struct {
 	int id;
+	int place;
 	char where[8];
 	char time[24];
 } CupRankLine;
@@ -74,6 +75,16 @@ int cup_known(void);
 // the server runs the cup mode (else time attack)
 int cup_mode(void);
 int cup_warmup(int *index, int *count, double *remaining_ms);
+#define MAX_RANKING 64
+typedef struct {
+	int place, id, points, last_points, finalist, winner, badge;
+	char name[96];
+} CupRankEntry;
+// cup ranking sent by the server (second table of the leaderboard), names of the observers ("" if none)
+int cup_ranking(const CupRankEntry **entries);
+const char *cup_spectators(void);
+// leaderboard.c: second table (cup ranking) under the leaderboard of the game, drawn at the end of the GUI
+void leaderboard_draw_cup(void *self, void *other);
 #define MAX_CP 64
 void cup_local_checkpoint(int index, long ms);
 // rank and gap (ms) with the best time at a checkpoint (0 = finish); 0 if nothing to compare with
@@ -87,7 +98,7 @@ long cup_finish_ms(int id);
 void cup_local_round_starts(void);
 void cup_set_local_state(char state);
 int cup_checkpoint(int id, long *ms);
-int cup_build_ranking(CupRankLine *lines, int max_lines);
+int cup_build_ranking(CupRankLine *lines, int max_lines, int keep_id);
 // clock.c
 double clock_server_ms(void);
 double clock_rtt_ms(void);

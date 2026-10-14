@@ -19,6 +19,17 @@ final class PatchNotesPage extends JPanel {
 	}
 
 	private static final Version[] VERSIONS = {
+			new Version("2.4.0", "14/10/2026",
+					new Section("Coupe", "Cup",
+							new Item("Deux classements séparés quand on affiche le classement (Tab) : en haut la manche en cours (temps, DNF, points gagnés), en dessous le classement de la coupe (points, FINALIST / WINNER, points gagnés à la dernière manche). 16 joueurs visibles dans chacun.",
+									"Two separate rankings when the leaderboard is shown (Tab): on top the current round (times, DNF, points won), below the cup ranking (points, FINALIST / WINNER, points won in the last round). 16 players visible in each one."),
+							new Item("Les spectateurs sont listés dans la barre de titre du classement de la coupe (plus dans les tableaux).",
+									"The spectators are listed in the title bar of the cup ranking (no longer in the tables).")),
+					new Section("Classements", "Rankings",
+							new Item("Les classements ne clignotent plus à l'arrivée de chaque joueur (classement de la coupe et classement des écarts en haut à gauche).",
+									"The rankings no longer flicker when a player finishes (cup ranking and gap ranking at the top left)."),
+							new Item("Classement des écarts en haut à gauche : si vous êtes au-delà de la 10e place, la dernière ligne affiche votre position (ou celle du joueur suivi en spectateur).",
+									"Gap ranking at the top left: if you are beyond the 10th place, the last line shows your position (or the one of the player followed as a spectator)."))),
 			new Version("2.3.1", "14/10/2026",
 					new Section("Positions des joueurs", "Positions of the players",
 							new Item("En course, les adversaires sont affichés plus près de leur position réelle (retard ≈ 28 ms, ~60 cm à pleine vitesse au lieu de ~1 m). En spectateur, le retard reste de 45 ms pour une restitution parfaite.",

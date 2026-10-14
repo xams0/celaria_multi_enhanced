@@ -17,6 +17,16 @@
 
 #define MAX_ID 256
 
+// cup: the states of a CUPROUND message are collected apart (CUPST messages) and replace the shown ones at the first
+// other message (no empty checkpoint ranking between the messages)
+static char pending_states[MAX_ID];
+static int collecting_states, pending_seen;
+
+// cup ranking (second table under the leaderboard of the round) and observers
+static CupRankEntry ranking[MAX_RANKING], pending[MAX_RANKING];
+static int ranking_count, pending_count;
+static char spectator_names[256];
+
 static int known;// a CUPROUND or CUPST message was received
 static int cup_mode_flag;// the server runs the cup mode (CUPROUND)
 static int round_on_map, rounds_per_map, round_running, points_limit;
@@ -54,6 +64,10 @@ void cupstate_reset(void) {
 	clear_best();
 	local_override = 0;
 	warmup_active = 0;
+	ranking_count = 0;
+	pending_count = 0;
+	collecting_states = 0;
+	spectator_names[0] = 0;
 }
 
 int cup_known(void) { return known; }
@@ -121,7 +135,55 @@ int cup_warmup(int *index, int *count, double *remaining_ms) {
 	return warmup_active;
 }
 
+
+int cup_ranking(const CupRankEntry **entries) {
+	*entries = ranking;
+	return ranking_count;
+}
+
+const char *cup_spectators(void) { return spectator_names; }
+
 int cupstate_handle_message(const char *text) {
+	if (collecting_states && pending_seen && strncmp(text, "\x01" "CUPST", 6) != 0) {
+		memcpy(states, pending_states, sizeof states);
+		collecting_states = 0;
+	}
+	// "\x01CUPRK <index> <count> <place> <id> <points> <last round points> <finalist> <winner rank> <badge> <name>"
+	if (strncmp(text, "\x01" "CUPRK ", 7) == 0) {
+		// the list is built apart and replaces the shown one when complete (no flicker during the update)
+		int index, count, n = 0;
+		CupRankEntry e = { 0 };
+		int fields = sscanf(text + 7, "%d %d %d %d %d %d %d %d %d %n", &index, &count, &e.place, &e.id, &e.points, &e.last_points, &e.finalist,
+			&e.winner, &e.badge, &n);
+		if (fields < 2) return 1;
+		if (index == 0) pending_count = 0;
+		if (fields >= 9 && n > 0 && index == pending_count && index < MAX_RANKING) {
+			snprintf(e.name, sizeof e.name, "%s", text + 7 + n);
+			pending[pending_count++] = e;
+		}
+		if (count <= 0) {
+			ranking_count = 0;
+		} else if (pending_count == (count < MAX_RANKING ? count : MAX_RANKING)) {
+			memcpy(ranking, pending, sizeof(CupRankEntry) * pending_count);
+			ranking_count = pending_count;
+		}
+		return 1;
+	}
+	// "\x01CUPSPEC <name>\x02<name>..."
+	if (strncmp(text, "\x01" "CUPSPEC", 8) == 0) {
+		const char *p = text[8] == ' ' ? text + 9 : text + 8;
+		size_t i = 0;
+		for (; *p && i + 3 < sizeof spectator_names; p++) {
+			if (*p == 2) {
+				spectator_names[i++] = ',';
+				spectator_names[i++] = ' ';
+			} else {
+				spectator_names[i++] = *p;
+			}
+		}
+		spectator_names[i] = 0;
+		return 1;
+	}
 	if (strncmp(text, "" "CUPWU ", 7) == 0) {
 		int active, index, count;
 		double remaining;
@@ -145,7 +207,9 @@ int cupstate_handle_message(const char *text) {
 			rounds_per_map = n;
 			round_running = running;
 			points_limit = limit;
-			memset(states, 0, sizeof states);// followed by the CUPST messages
+			memset(pending_states, 0, sizeof pending_states);// followed by the CUPST messages
+			collecting_states = 1;
+			pending_seen = 0;
 		}
 		return 1;
 	}
@@ -161,9 +225,11 @@ int cupstate_handle_message(const char *text) {
 			}
 			if (id >= 0 && id < MAX_ID) {
 				states[id] = state;
+				pending_states[id] = state;
 				if (ms >= 0) finish_ms[id] = ms;
 			}
 		}
+		pending_seen = 1;
 		known = 1;
 		local_override = 0;
 		return 1;
@@ -258,7 +324,7 @@ static int compare_lines(const void *a, const void *b) {
 
 // checkpoint ranking of the round: finishers by time, then the other players by checkpoint and time at the checkpoint
 // (time attack: current runs of the players)
-int cup_build_ranking(CupRankLine *lines, int max_lines) {
+int cup_build_ranking(CupRankLine *lines, int max_lines, int keep_id) {
 	RankLine list[MAX_ID];
 	int n = 0;
 	for (int id = 0; id < MAX_ID; id++) {
@@ -270,8 +336,13 @@ int cup_build_ranking(CupRankLine *lines, int max_lines) {
 		}
 	}
 	qsort(list, n, sizeof list[0], compare_lines);
+	// keep_id (local or spectated player) beyond the shown lines: on the last line, with his place
+	int keep = -1;
+	for (int i = max_lines - 1; i < n; i++)
+		if (list[i].id == keep_id) keep = i;
 	int count = 0;
 	for (int i = 0; i < n && count < max_lines; i++) {
+		if (keep >= 0 && count == max_lines - 1) i = keep;
 		RankLine *l = &list[i];
 		// gap with the best time at the same checkpoint (or the best finish)
 		long best = -1;
@@ -282,6 +353,7 @@ int cup_build_ranking(CupRankLine *lines, int max_lines) {
 			}
 		CupRankLine *out = &lines[count++];
 		out->id = l->id;
+		out->place = i + 1;
 		if (best >= 0) {
 			out->time[0] = '+';
 			format_ms(out->time + 1, sizeof out->time - 1, l->ms - best);

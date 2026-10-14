@@ -349,7 +349,8 @@ public class PlayerProcessor implements Runnable {
 				LeaderboardFindResult individualEntry = Util.findPlayerEntry(leaderboard, player.getID());
 
 				boolean additionalPlayerEntry = false;
-				if (leaderboardRequested.addOwnEntry == true && individualEntry != null) {
+				// cup: no own entry at the bottom of the panel (the place is used by the second table of the mod)
+				if (leaderboardRequested.addOwnEntry == true && individualEntry != null && cupMode == false) {
 					additionalPlayerEntry = true;
 				}
 

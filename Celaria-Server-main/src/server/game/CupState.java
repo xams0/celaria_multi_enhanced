@@ -529,6 +529,38 @@ public class CupState {
 			b.append(part);
 		}
 		messages.add(b.toString());
+		messages.addAll(buildRankingMessages());
+		return messages;
+	}
+
+	/**
+	 * Cup ranking for the mod (second table under the leaderboard of the round): one hidden message per player
+	 * "CUPRK <index> <count> <place> <id> <points> <points of the last round> <finalist 0/1> <winner rank> <badge> <name>"
+	 * (index 0 = new list), then the observers "CUPSPEC <name>\u0002<name>..." (shown on a line, not in the tables).
+	 */
+	private List<String> buildRankingMessages() {
+		List<String> messages = new ArrayList<String>();
+		List<CupPlayer> standings = getStandings();
+		for (int i = 0; i < standings.size(); i++) {
+			CupPlayer p = standings.get(i);
+			messages.add("CUPRK " + i + " " + standings.size() + " " + (i + 1) + " " + p.playerID + " " + p.points + " " + p.lastRoundPoints + " "
+					+ (p.finalist ? 1 : 0) + " " + p.winnerRank + " " + p.badge + " " + p.name);
+		}
+		if (standings.isEmpty()) {
+			messages.add("CUPRK 0 0");
+		}
+		StringBuilder spec = new StringBuilder("CUPSPEC ");
+		boolean first = true;
+		for (CupPlayer p : playersByID.values()) {
+			if (p.observer && spec.length() + p.name.length() < 240) {
+				if (first == false) {
+					spec.append('\u0002');
+				}
+				spec.append(p.name);
+				first = false;
+			}
+		}
+		messages.add(spec.toString());
 		return messages;
 	}
 
@@ -853,10 +885,10 @@ public class CupState {
 	 * The places are numbered from 1 in each part; the title lines have no place (player id 255, hidden by the mod).
 	 */
 	public synchronized List<CupLeaderboardEntry> buildLeaderboard() {
+		// leaderboard of the game: the round only (the cup ranking is a second table drawn by the mod, the observers are
+		// listed on a line by the mod); clients without the mod: /cup in the chat
 		List<CupLeaderboardEntry> entries = new ArrayList<CupLeaderboardEntry>();
 		List<CupPlayer> standings = getStandings();
-		String roundTitle = warmupRound || (roundRunning == false && isWarmup()) ? "=== WARMUP ===" : "=== ROUND " + Math.max(1, roundRunning ? roundsPlayedOnMap + 1 : roundsPlayedOnMap) + "/" + settings.roundsPerMap + " ===";
-		entries.add(title(roundTitle));
 		int place = 1;
 		for (RoundFinish f : roundFinishes) {
 			if (f.player.connected) {
@@ -872,32 +904,11 @@ public class CupState {
 				}
 			}
 		}
-		entries.add(title("=== CUP RANKING ==="));
-		place = 1;
-		for (CupPlayer p : standings) {
-			String text = p.getStatusText();
-			if (roundRunning == false && p.lastRoundPoints > 0) {
-				text += " (+" + p.lastRoundPoints + ")";
-			} else if (roundRunning && roundStartTimes.containsKey(p.playerID) == false) {
-				text += " (spec)";
+		if (entries.isEmpty()) {
+			// nothing to show for the round yet: the players of the cup (for the clients without the mod too)
+			for (CupPlayer p : standings) {
+				entries.add(new CupLeaderboardEntry(p.playerID, p.name, p.badge, false, 0, 0).at(place++));
 			}
-			entries.add(new CupLeaderboardEntry(p.playerID, text + " | " + p.name, p.badge, false, 0, 0).at(place++));
-		}
-		// observers (casters): out of the competition, below the players
-		List<CupPlayer> observers = new ArrayList<CupPlayer>();
-		for (CupPlayer p : playersByID.values()) {
-			if (p.observer) {
-				observers.add(p);
-			}
-		}
-		Collections.sort(observers, new Comparator<CupPlayer>() {
-			@Override
-			public int compare(CupPlayer a, CupPlayer b) {
-				return a.name.compareTo(b.name);
-			}
-		});
-		for (CupPlayer p : observers) {
-			entries.add(new CupLeaderboardEntry(p.playerID, "SPECTATE | " + p.name, p.badge, false, 0, 0).at(place++));
 		}
 		return entries;
 	}
