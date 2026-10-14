@@ -30,7 +30,7 @@
 #define STEP_MS 10.0// engine step (step_networkPlayer runs at 100 Hz)
 #define MAX_PREDICTION_MS 300.0
 #define MIN_PREDICTION_MS -150.0
-#define CORRECTION_DECAY 0.82// per step
+#define CORRECTION_DECAY 0.88// per step (small network corrections fade over ~8 steps)
 #define MAX_CORRECTION 4.0// larger jumps (respawn) aren't smoothed
 
 #define SLOT_FN_BUFFER_GET_ADDRESS 0x00f3851c
@@ -83,6 +83,7 @@ typedef struct {
 	double last_arrival;
 } LookTrack;
 static LookTrack looks[256];
+static int step_count[256];// steps recorded for the interpolation of the displayed position (see below)
 // race time of the last position of every player (time stamp of the mod) and its local reception time
 static double stamp_time[256], stamp_arrival[256];
 
@@ -149,6 +150,7 @@ void prediction_reset(void) {
 	lag_known = 0;
 	memset(corrections, 0, sizeof corrections);
 	memset(looks, 0, sizeof looks);
+	memset(step_count, 0, sizeof step_count);
 	memset(stamp_arrival, 0, sizeof stamp_arrival);
 }
 
@@ -373,12 +375,73 @@ static RValue *__cdecl hook_read_apply(void *self, void *other, RValue *result, 
 	return result;
 }
 
+// Displayed position of the other players at every frame. The game moves them once per engine step (100 Hz) and draws
+// them at this position, while the local player and the camera are interpolated between two steps at every frame: at
+// 144 fps a close opponent judders. The mod keeps the positions of the last two steps and draws the other players
+// between them, with the interpolation factor of the game (get_render_delta), like the local player.
+#define GML_GET_RENDER_DELTA 0x004cc000
+static double step_prev[256][3], step_cur[256][3];
+static void *interp_instance[MAX_TRACKED];
+static int interp_id[MAX_TRACKED];
+static int interp_count = -1;// -1: no interpolation applied
+
+static void record_step(void *self, int id) {
+	memcpy(step_prev[id], step_cur[id], sizeof step_cur[id]);
+	step_cur[id][0] = yy_to_real(yy_self_var(self, VAR_MODEL_X));
+	step_cur[id][1] = yy_to_real(yy_self_var(self, VAR_MODEL_Y));
+	step_cur[id][2] = yy_to_real(yy_self_var(self, VAR_MODEL_Z));
+	if (step_count[id] < 2) step_count[id]++;
+}
+
+void prediction_interpolate_begin(void *self, void *other) {
+	if (active() == 0 || interp_count >= 0) return;
+	RValue r = { 0 };
+	((GmlScript)ADDR(GML_GET_RENDER_DELTA))(self, other, &r, 0, NULL);
+	double alpha = yy_to_real(&r);
+	yy_clear(&r);
+	if (alpha < 0) alpha = 0;
+	if (alpha > 1) alpha = 1;
+	uint8_t iterator[1024];
+	void *s = self, *o = other;
+	interp_count = 0;
+	if (YY_WITH_NEW(iterator, &s, &o, OBJ_NETWORK_PLAYER) > 0) {
+		do {
+			int id = (int)yy_to_real(yy_self_var(s, VAR_NETWORK_PLAYER_ID));
+			if (id < 0 || id > 255 || step_count[id] < 2 || interp_count >= MAX_TRACKED) continue;
+			double *a = step_prev[id], *b = step_cur[id];
+			// the model must still be at the position of the last step (no teleport / respawn in between)
+			if (fabs(yy_to_real(yy_self_var(s, VAR_MODEL_X)) - b[0]) > 0.001 || fabs(b[0] - a[0]) > 6 || fabs(b[1] - a[1]) > 6
+				|| fabs(b[2] - a[2]) > 6) continue;
+			yy_set_real(yy_self_var(s, VAR_MODEL_X), a[0] + (b[0] - a[0]) * alpha);
+			yy_set_real(yy_self_var(s, VAR_MODEL_Y), a[1] + (b[1] - a[1]) * alpha);
+			yy_set_real(yy_self_var(s, VAR_MODEL_Z), a[2] + (b[2] - a[2]) * alpha);
+			interp_instance[interp_count] = s;
+			interp_id[interp_count++] = id;
+		} while (YY_WITH_NEXT(iterator, &s, &o));
+	}
+	YY_WITH_DELETE(iterator, &s, &o);
+}
+
+void prediction_interpolate_end(void) {
+	for (int i = 0; i < interp_count; i++) {
+		double *b = step_cur[interp_id[i]];
+		yy_set_real(yy_self_var(interp_instance[i], VAR_MODEL_X), b[0]);
+		yy_set_real(yy_self_var(interp_instance[i], VAR_MODEL_Y), b[1]);
+		yy_set_real(yy_self_var(interp_instance[i], VAR_MODEL_Z), b[2]);
+	}
+	interp_count = -1;
+}
+
 // step of another player: displayed at its (extrapolated) position + the decaying correction
 static RValue *__cdecl hook_step_network_player(void *self, void *other, RValue *result, int argc, RValue **args) {
 	orig_step_network_player(self, other, result, argc, args);
 	if (active() == 0 || self == NULL) return result;
 	int id = (int)yy_to_real(yy_self_var(self, VAR_NETWORK_PLAYER_ID));
-	if (id < 0 || id > 255 || corrections[id].valid == 0) return result;
+	if (id < 0 || id > 255) return result;
+	if (corrections[id].valid == 0) {
+		record_step(self, id);
+		return result;
+	}
 	Correction *c = &corrections[id];
 	c->x *= CORRECTION_DECAY;
 	c->y *= CORRECTION_DECAY;
@@ -392,6 +455,7 @@ static RValue *__cdecl hook_step_network_player(void *self, void *other, RValue 
 	yy_set_real(yy_self_var(self, VAR_MODEL_Y), yy_to_real(&v) + c->y);
 	yy_clear(&v);
 	yy_set_real(yy_self_var(self, VAR_MODEL_Z), yy_to_real(yy_self_var(self, VAR_Z)) + c->z);
+	record_step(self, id);
 	return result;
 }
 

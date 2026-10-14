@@ -245,7 +245,8 @@ public class GameState {
 		finishTimeoutTargetMS = 0;
 		if(cup != null) {
 			cup.startRound(System.currentTimeMillis());
-			roundTargetTimeMS = System.currentTimeMillis()+cupRoundTimeMS;
+			// warmup with a duration: the round lasts the warmup time
+			roundTargetTimeMS = System.currentTimeMillis()+(cup.isTimedWarmupRound() ? cup.getSettings().warmupTimeSec*1000L : cupRoundTimeMS);
 		}else if(timeAttackWarmupPending) {
 			timeAttackWarmupPending = false;
 			timeAttackWarmup = true;
@@ -264,6 +265,9 @@ public class GameState {
 	 */
 	/** cup mode: end of the round once every player finished (setting cup_allFinishedDelay) */
 	public boolean shortenRoundAllFinished(){
+		if (cup != null && cup.isTimedWarmupRound()) {
+			return false;// warmup with a duration: it lasts its time even if everybody finished
+		}
 		return shortenRound(cup != null ? Math.round(cup.getSettings().allFinishedDelaySec*1000) : 3000);
 	}
 

@@ -79,10 +79,15 @@ public class ServerProcessor implements Runnable{
 	private boolean taReplayAfterWarmup;// time attack: the warmup is over, the map is reloaded for the real round
 
 	/** server console: next map (1), restart the map (2), map by file name (3) */
-	public void requestMap(int kind, String name) {
+	/** kind: 1 next map, 2 restart the map, 3 map by file name, 4 new game (points reset, current map); warmup: the map starts with its warmup */
+	public void requestMap(int kind, String name, boolean warmup) {
 		mapRequestName = name;
+		mapRequestWarmup = warmup;
 		mapRequest = kind;
 	}
+
+	private volatile boolean mapRequestWarmup;
+	private boolean forcedWarmup;
 
 	public int getCurrentMapIndex() {
 		return currentMapIndex;
@@ -116,6 +121,14 @@ public class ServerProcessor implements Runnable{
 		} else if (index < 0) {
 			index = 0;
 		}
+		if (kind == 4) {
+			// new game: points of the cup / times of the time attack leaderboard reset
+			if (state.isCupMode()) {
+				state.getCup().resetMatch();
+			}
+			state.getHighscoreState().resetTimes();
+		}
+		forcedWarmup = mapRequestWarmup;
 		if (state.getRoundRunning()) {
 			state.setRoundRunning(false);
 			if (state.isCupMode()) {
@@ -128,7 +141,8 @@ public class ServerProcessor implements Runnable{
 		taReplayAfterWarmup = false;
 		forcedMapLoad = true;
 		forcedMapIndex = index;
-		core.sendTcpBroadcastChatMessage(ChatMessageColors.gamestateColor, (kind == 2 ? "Map restarted: " : "Map: ") + list[index]);
+		String what = kind == 4 ? "New game (scores reset): " : kind == 2 ? "Map restarted: " : "Map: ";
+		core.sendTcpBroadcastChatMessage(ChatMessageColors.gamestateColor, what + list[index] + (forcedWarmup ? " (warmup)" : ""));
 	}
 	
 	
@@ -267,8 +281,10 @@ public class ServerProcessor implements Runnable{
 		core.cupSynchronizedStart(state.getCupStartClockMS());
 		lastFinishTimeoutAnnounce = -1;
 		CupState cup = state.getCup();
-		if (cup.isWarmup()) {
-			core.sendTcpBroadcastChatMessage(ChatMessageColors.gamestateColor, "WARMUP "+cup.getWarmupIndex()+"/"+cup.getSettings().warmupRounds+" on this map: no points.");
+		if (cup.isTimedWarmupRound()) {
+			core.sendTcpBroadcastChatMessage(ChatMessageColors.gamestateColor, "WARMUP "+cup.getSettings().warmupTimeSec+" s: free practice, restart as you like, no points.");
+		} else if (cup.isWarmup()) {
+			core.sendTcpBroadcastChatMessage(ChatMessageColors.gamestateColor, "WARMUP "+cup.getWarmupIndex()+"/"+cup.getWarmupRounds()+" on this map: no points.");
 		} else {
 			core.sendTcpBroadcastChatMessage(ChatMessageColors.gamestateColor, "Cup - round "+(cup.getRoundsPlayedOnMap()+1)+"/"+cup.getSettings().roundsPerMap+" on this map. Points limit: "+cup.getSettings().pointsLimit);
 		}
@@ -364,6 +380,9 @@ public class ServerProcessor implements Runnable{
 							forcedMapLoad = false;
 							if (state.isCupMode()) {
 								state.getCup().mapChanged();
+								if (forcedWarmup == false) {
+									state.getCup().skipWarmup();
+								}
 							}
 							currentMapIndex = forcedMapIndex - 1;
 						} else if (state.isCupMode() == false && afterWarmup) {
@@ -395,7 +414,7 @@ public class ServerProcessor implements Runnable{
 						if(replayMap == false || currentMapIndex < 0) {
 							currentMapIndex++;
 						}
-						state.setTimeAttackWarmupPending(state.isCupMode() == false && afterWarmup == false);
+						state.setTimeAttackWarmupPending(state.isCupMode() == false && afterWarmup == false && (forcedNow == false || forcedWarmup));
 						if(currentMapIndex >= core.getRessourceHandler().getMapFileList().length){
 							currentMapIndex = 0;
 						}
@@ -473,6 +492,8 @@ public class ServerProcessor implements Runnable{
 
 					//cup mode: complete resets of the clients without the mod
 					core.cupProcessPendingResets();
+					//cup mode: players who join during a warmup with a duration start at once
+					core.cupWarmupLateStart();
 
 					//mod: delays of the other players (prediction) and state of the players, every 2 seconds (both modes)
 					if(System.currentTimeMillis() - lastPlayerDelaysSent >= 2000) {

@@ -39,6 +39,17 @@ Il se désactive à la déconnexion.
 - **Connexion directe** : `LP3_CONNECT=adresse:port` (posé par le launcher) → après le menu principal, le mod fait
   « Multiplayer » puis la connexion Direct-IP.
 
+## V2.1
+
+- Les autres joueurs sont dessinés entre deux pas de simulation (facteur d'interpolation du jeu `get_render_delta`) :
+  plus de saccade quand ils sont proches (le jeu ne les déplace qu'à 100 Hz, la caméra est interpolée à chaque image).
+- Compte à rebours : le jeu n'affiche 3, 2, 1 que si son chrono vaut exactement -300, -200, -100 ; le recalage sur
+  l'horloge du serveur ne saute plus ces valeurs.
+- Écart avec le 1er à chaque checkpoint : affiché à la réception du message `CUPCP` du serveur (numéro du checkpoint).
+- Spectateur : uniquement par le bouton Spectator du menu Échap (ou automatique après l'arrivée / un DNF en Coupe) ; V
+  change de vue entre 1re personne, 3e personne et caméra libre ; « Waiting for server... » masqué en spectateur.
+- Warmup au temps : boîte « WARMUP m:ss » en Coupe aussi.
+
 ## Installation
 
 - `install.bat` (par défaut dans `D:\SteamLibrary\steamapps\common\Celaria`, sinon `install.bat "chemin\vers\Celaria"`)

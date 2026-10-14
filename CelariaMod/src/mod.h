@@ -43,6 +43,9 @@ void spectator_local_checkpoint(int index, long ms);
 void spectator_player_checkpoint(int id, int index, long ms);
 // race time of another player now (time stamps of his positions), -1 if unknown
 double prediction_race_time(int id);
+// the other players are drawn between their last two steps (call around the drawing)
+void prediction_interpolate_begin(void *self, void *other);
+void prediction_interpolate_end(void);
 // native functions of the game wrapped by the mod (the table is filled at the start of the game)
 void prediction_wrap_natives(void);
 void lanbrowser_wrap_natives(void);

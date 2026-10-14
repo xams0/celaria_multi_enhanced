@@ -67,6 +67,8 @@ and the points won in the last round (`52 pts (+10) | Name`). Results and announ
 | `cup_finishTimeout` | `-1` | Seconds left after the first finisher (`-1`: 5 s + platinum medal time / 6) |
 | `cup_roundTimeLimit` | `300` | Maximum length of a round in seconds |
 | `cup_bots` | `0` | Bots connected when the server starts (they replay the best recorded run of the map) |
+| `cup_warmupMode` | `rounds` | `rounds`: warmup rounds; `time`: one warmup of `cup_warmupTime` seconds (free practice: restarts allowed, best finish kept, players who join start at once) |
+| `cup_warmupTime` | `120` | Duration of the warmup in `time` mode (seconds, 0 = no warmup) |
 | `cup_warmupRounds` | `1` | Warmup rounds at the start of every map: no points, no DNF (0 = no warmup) |
 | `cup_respawnAtStartDNF` | `false` | Respawn key without checkpoint (back to the start) = DNF. With the mod the timer continues; without the mod the server adds the lost time |
 | `cup_forceRestartDNF` | `true` | Restart key (complete reset of the run) = DNF for the round |
@@ -91,6 +93,8 @@ Maps of the current editor (format 3) are accepted. The list of maps is read aga
 Console without window (used by the Celaria Lanppart3 launcher): `java -jar CelariaServer.jar --headless --config server.conf`
 (`--managed`: the server stops when its standard input closes). Commands on the standard input: `nextmap`, `restartmap`,
 `map <file>`, `maps`, `status`, `say <text>`, `players`, `cupreset`, `bots <n>`, `stop`.
+V2.1: `restartmap` restarts the map without warmup; `newgame` / `newgame warmup` reset the points (cup) / times (time
+attack) and restart the map; `warmup restart`, `warmup add <seconds>` (warmup with a duration), `warmup addround` (cup).
 LAN discovery: the launcher sends `CCPI` and gets `CSPI|port|players|max|protocol|password|mode|map|name`.
 
 LAN discovery: the server answers the "Server Browser LAN" of the cup mod on UDP port 26510 (all the local networks:

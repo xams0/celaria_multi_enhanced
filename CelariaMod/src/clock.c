@@ -161,7 +161,21 @@ static void align_countdown(double server_now) {
 	double target = floor((server_now - race_start) / STEP_MS);
 	if (target > -1) target = -1;// the last step before 0 is done by the game
 	if (target < -COUNTDOWN_TICKS) target = -COUNTDOWN_TICKS;
-	if (fabs(timer - target) >= 1) set_var(OBJ_TIMER, VAR_AKT_TIME, target);
+	// The game shows "3", "2", "1" (and plays the sound) only on the step where its timer is exactly -300, -200, -100.
+	// The timer is only corrected when it is 2 steps or more away, and never over one of these values: a correction which
+	// would skip a digit stops just before it (the digit is shown at the next step), a correction backwards never goes
+	// back over a digit already shown. Every player sees 3, 2, 1, Go!
+	if (fabs(timer - target) < 2) return;
+	if (fmod(timer, 100.0) == 0) return;// the digit of this step isn't shown yet
+	double t = target;
+	if (target > timer) {
+		double next_digit = floor(timer / 100.0) * 100.0 + 100.0;// next multiple of 100 above the timer
+		if (next_digit < 0 && t >= next_digit) t = next_digit - 1;
+	} else {
+		double last_digit = floor(timer / 100.0) * 100.0;// multiple of 100 already passed
+		if (t <= last_digit) t = last_digit + 1;
+	}
+	if (t != timer) set_var(OBJ_TIMER, VAR_AKT_TIME, t);
 }
 
 // called once per frame

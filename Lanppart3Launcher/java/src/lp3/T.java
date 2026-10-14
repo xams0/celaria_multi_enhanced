@@ -225,6 +225,19 @@ public final class T {
 		e("%d map(s) supprimée(s).", "%d map(s) deleted.");
 		e("format %d (trop récent pour le serveur ?)", "format %d (too recent for the server?)");
 		e("%d Ko", "%d KB");
+		e("Nouvelle partie", "New game");
+		e("Nouvelle partie + warmup", "New game + warmup");
+		e("Relancer le warmup", "Restart warmup");
+		e("Warmup +1 min", "Warmup +1 min");
+		e("+1 manche warmup", "+1 warmup round");
+		e("Les points (Coupe) / les temps (Time Attack) de tous les joueurs sont remis à zéro et la map recommence. Continuer ?",
+				"The points (Cup) / times (Time Attack) of every player are reset and the map starts again. Continue?");
+		e("Les points (Coupe) / les temps (Time Attack) de tous les joueurs sont remis à zéro et la map recommence avec son warmup. Continuer ?",
+				"The points (Cup) / times (Time Attack) of every player are reset and the map starts again with its warmup. Continue?");
+		e("Warmup au temps", "Warmup with a duration");
+		e("Coché : warmup d'une durée (entraînement libre). Sinon : en manches", "Checked: warmup with a duration (free practice). Else: in rounds");
+		e("Durée du warmup (s)", "Warmup duration (s)");
+		e("Warmup au temps (0 = pas de warmup)", "Warmup with a duration (0 = no warmup)");
 		// patch notes page
 		e("Patch notes", "Patch notes");
 		e("Vérifier les mises à jour", "Check for updates");

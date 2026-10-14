@@ -9,7 +9,7 @@ import java.util.*;
 public final class ServerConf {
 
 	public enum Type {
-		TEXT, PASSWORD, INT, DECIMAL, BOOL
+		TEXT, PASSWORD, INT, DECIMAL, BOOL, WARMUP_MODE// WARMUP_MODE: check box, "time" / "rounds"
 	}
 
 	public enum Group {
@@ -26,6 +26,8 @@ public final class ServerConf {
 			new Setting("password", Group.GENERAL, Type.PASSWORD, "Mot de passe", "", "Vide = serveur ouvert"),
 			new Setting("adminPassword", Group.GENERAL, Type.PASSWORD, "Mot de passe admin", "", "Pour /login en jeu (commandes admin)"),
 
+			new Setting("cup_warmupMode", Group.CUP, Type.WARMUP_MODE, "Warmup au temps", "rounds", "Coché : warmup d'une durée (entraînement libre). Sinon : en manches"),
+			new Setting("cup_warmupTime", Group.CUP, Type.INT, "Durée du warmup (s)", "120", "Warmup au temps (0 = pas de warmup)"),
 			new Setting("cup_warmupRounds", Group.CUP, Type.INT, "Manches de warmup", "1", "Au début de chaque map, sans points (0 = pas de warmup)"),
 			new Setting("cup_pointsLimit", Group.CUP, Type.INT, "Points pour être finaliste", "100", ""),
 			new Setting("cup_roundsPerMap", Group.CUP, Type.INT, "Manches par map", "5", ""),

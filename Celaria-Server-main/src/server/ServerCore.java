@@ -613,7 +613,8 @@ public class ServerCore {
 	 * and start by themselves at this time (hidden message), so that every player starts at the same real time.
 	 */
 	public void cupAnnounceScheduledStart(double startClock) {
-		long roundTicks = getGameState().getCup().getSettings().roundTimeLimitSec * 100L;
+		server.game.CupState.Settings settings = getGameState().getCup().getSettings();
+		long roundTicks = (getGameState().getCup().isWarmup() && settings.warmupTimeMode ? settings.warmupTimeSec : settings.roundTimeLimitSec) * 100L;
 		long now = System.currentTimeMillis();
 		readPlayerListLock.lock();
 		try {
@@ -685,6 +686,42 @@ public class ServerCore {
 		cupSendState();
 	}
 
+	/**
+	 * Cup mode, warmup with a duration (free practice): a player who joins or loads the map during the warmup starts at
+	 * once (start signal + participant), he doesn't wait for the next round. Called by the server processor.
+	 */
+	public void cupWarmupLateStart() {
+		server.game.CupState cup = getGameState().getCup();
+		if (getGameState().isCupMode() == false || cup.isTimedWarmupRound() == false) {
+			return;
+		}
+		long now = System.currentTimeMillis();
+		java.util.List<Player> late = new java.util.ArrayList<Player>();
+		readPlayerListLock.lock();
+		try {
+			for (Player p : players.values()) {
+				if (p.getPlayerServerData().isSigned() && p.getPlayerServerData().isReadyForCupStart(now) && cup.canRace(p.getID())
+						&& cup.isParticipant(p.getID()) == false && p.getPlayerServerData().getSendStartRoundMessage() == false) {
+					late.add(p);
+				}
+			}
+		} finally {
+			readPlayerListLock.unlock();
+		}
+		for (Player p : late) {
+			ByteBuffer message = ByteBuffer.allocate(4);
+			BufferConverter.buffer_write_u32(message, getGameState().getRemainingRoundTimeTicks());
+			p.getPlayerServerData().setSendStartRoundMessage(true);
+			sendTcpMessageLocked(p, PlayerProcessor.TcpServerMessage.ROUND_START, message);
+			PlayerRuntimeUdpData d = p.getPlayerDataCopy();
+			cup.addParticipant(p.getID(), d.getX(), d.getY(), d.getZ(), d.getRespawnNumber());
+			sendTcpChatMessage(p, ChatMessageColors.serverNotificationColor, "Warmup running: you can drive at once.");
+		}
+		if (late.isEmpty() == false) {
+			cupSendState();
+		}
+	}
+
 	private java.util.List<Player> modPlayers() {
 		java.util.List<Player> list = new java.util.ArrayList<Player>();
 		readPlayerListLock.lock();
@@ -723,7 +760,9 @@ public class ServerCore {
 	public void cupSendState() {
 		java.util.List<String> messages;
 		if (getGameState().isCupMode()) {
-			messages = getGameState().getCup().buildStateMessages(getGameState().getCupStartClockMS());
+			server.game.CupState cupState = getGameState().getCup();
+			messages = cupState.buildStateMessages(getGameState().getCupStartClockMS(),
+					cupState.isTimedWarmupRound() ? getGameState().getRemainingRoundMS() : -1);
 		} else {
 			java.util.List<Integer> ids = new java.util.ArrayList<Integer>(players.keySet());
 			messages = getGameState().getTimeAttackMod().stateMessages(ids);
@@ -898,16 +937,55 @@ public class ServerCore {
 		String arg = parts.length > 1 ? parts[1] : "";
 		switch (parts[0].toLowerCase()) {
 		case "nextmap":
-			serverRealtime.requestMap(1, null);
+			serverRealtime.requestMap(1, null, true);
 			return "Next map requested.";
 		case "restartmap":
-			serverRealtime.requestMap(2, null);
-			return "Restart of the map requested.";
+			serverRealtime.requestMap(2, null, false);
+			return "Restart of the map requested (without warmup).";
+		case "newgame": {
+			// new game on the current map: points (cup) / times (time attack) reset; "newgame warmup": with the warmup
+			boolean warmup = arg.trim().equalsIgnoreCase("warmup");
+			serverRealtime.requestMap(4, null, warmup);
+			return "New game requested" + (warmup ? " (with warmup)." : ".");
+		}
+		case "warmup": {
+			String[] w = arg.trim().split("\\s+");
+			GameState s = getGameState();
+			if (w[0].equalsIgnoreCase("restart")) {
+				serverRealtime.requestMap(2, null, true);
+				return "Restart of the warmup requested.";
+			}
+			if (w[0].equalsIgnoreCase("add")) {
+				int seconds = 60;
+				try {
+					seconds = Integer.parseInt(w.length > 1 ? w[1] : "60");
+				} catch (NumberFormatException e) {
+					return "usage: warmup add <seconds>";
+				}
+				boolean timed = s.isCupMode() ? s.getCup().isTimedWarmupRound() : s.isTimeAttackWarmup();
+				if (timed == false) {
+					return "No warmup with a duration is running (cup with rounds: warmup addround).";
+				}
+				extendTime(seconds);
+				sendTcpBroadcastChatMessage(ChatMessageColors.gamestateColor, "Warmup extended by " + seconds + " seconds.");
+				return "Warmup extended by " + seconds + " s.";
+			}
+			if (w[0].equalsIgnoreCase("addround")) {
+				if (s.isCupMode() == false) {
+					return "Warmup rounds need the cup mode (time attack: warmup add <seconds>).";
+				}
+				s.getCup().addWarmupRound();
+				sendTcpBroadcastChatMessage(ChatMessageColors.gamestateColor, "One more warmup round on this map.");
+				cupSendState();
+				return "One more warmup round.";
+			}
+			return "usage: warmup restart | warmup add <seconds> | warmup addround";
+		}
 		case "map":
 			if (arg.trim().isEmpty()) {
 				return "usage: map <file name>";
 			}
-			serverRealtime.requestMap(3, arg.trim());
+			serverRealtime.requestMap(3, arg.trim(), true);
 			return "Map requested: " + arg.trim();
 		case "maps": {
 			// launcher: list of the maps of the rotation
@@ -963,7 +1041,7 @@ public class ServerCore {
 			return b.toString();
 		}
 		default:
-			return "Commands: nextmap, restartmap, map <file>, maps, say <text>, cupreset, bots <count>, players, status, stop";
+			return "Commands: nextmap, restartmap, map <file>, maps, newgame [warmup], warmup restart|add <s>|addround, say <text>, cupreset, bots <count>, players, status, stop";
 		}
 	}
 

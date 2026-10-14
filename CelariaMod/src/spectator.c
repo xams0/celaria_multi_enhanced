@@ -92,7 +92,6 @@ static void show_gap(int id, int checkpoint, long ms);
 static void gap_clear(void);
 static int target_id = -1;// networkPlayerID of the followed player
 static int spectating;// view active and allowed this frame
-static int manual_off;// the player switched the spectator mode off: no automatic view until the next round
 static double target_lost_since;// the followed player stopped racing (local ms), 0 = racing
 static int finish_screen_closed;
 static char target_name[64];
@@ -218,7 +217,6 @@ void spectator_round_starts(void) {
 	gap_clear();
 	view = VIEW_OFF;
 	spectating = 0;
-	manual_off = 0;
 	target_lost_since = 0;
 	not_racing_since = 0;
 	free_initialised = 0;
@@ -347,12 +345,15 @@ static void update(void *self, void *other) {
 	}
 	if (not_racing_since == 0) not_racing_since = now_ms;
 	int focus = game_has_focus();
+	int v_pressed = focus && key_pressed('V');
 	if (focus) {
-		if (key_pressed('V')) {
-			view = (view + 1) % VIEW_COUNT;
+		// V: next view (first person -> third person -> free camera). Only while spectating: a player who races enters the
+		// spectator mode with the Spectator button of the pause menu (or automatically once he can't race any more).
+		if (v_pressed && view != VIEW_OFF) {
+			view = view == VIEW_FREE ? VIEW_FIRST_PERSON : view + 1;
 			free_initialised = 0;
-					if (view == VIEW_OFF) manual_off = 1;
-			if (view != VIEW_OFF && find_player(target_id) == NULL) target_id = pick_target(-1);
+			if (view != VIEW_FREE && find_player(target_id) == NULL) target_id = pick_target(-1);
+			if (view != VIEW_FREE && target_id < 0) view = VIEW_FREE;// nobody to follow
 			if (view == VIEW_THIRD_PERSON) orbit_initialised = 0;
 			mod_log("spectator view: %d", view);
 		}
@@ -368,12 +369,16 @@ static void update(void *self, void *other) {
 	// automatic first person view 5 seconds after the local player stopped racing, if other players are racing
 	// (time attack: observers only, the players restart their runs)
 	int observer = cup_known() && cup_state(cup_local_id()) == 'V';
-	if (view == VIEW_OFF && manual_off == 0 && cup_known() && ((cup_mode() && cup_round_running()) || observer) && racing_players() > 0
-		&& now_ms - not_racing_since > AUTO_SPECTATE_DELAY_MS) {
-		view = VIEW_FIRST_PERSON;
+	int wi, wc;
+	double wr;
+	int warmup = cup_warmup(&wi, &wc, &wr);// warmup: the players restart their runs, no automatic view
+	if (view == VIEW_OFF && cup_known() && ((cup_mode() && cup_round_running() && warmup == 0 && racing_players() > 0) || observer)
+		&& now_ms - not_racing_since > (observer ? 0 : AUTO_SPECTATE_DELAY_MS)) {
 		target_id = pick_target(-1);
+		view = target_id >= 0 ? VIEW_FIRST_PERSON : VIEW_FREE;// observer alone: free camera
+		free_initialised = 0;
 		target_lost_since = 0;
-		mod_log("automatic spectator view: player %d", target_id);
+		mod_log("automatic spectator view %d: player %d", view, target_id);
 	}
 	// the followed player finished or left: another racing player after a moment
 	if (view != VIEW_OFF && view != VIEW_FREE) {
@@ -408,6 +413,14 @@ static void update(void *self, void *other) {
 
 	if (view == VIEW_FREE) {
 		if (free_initialised == 0) {
+			if (cam_eye[0] == 0 && cam_eye[1] == 0 && cam_eye[2] == 0) {
+				// no view yet: starts from the camera of the game
+				cam_eye[0] = obj_var(OBJ_CAMERA, 1708);
+				cam_eye[1] = obj_var(OBJ_CAMERA, 1736);
+				cam_eye[2] = obj_var(OBJ_CAMERA, 1785);
+				cam_yaw = -obj_var(OBJ_CAMERA, 934);
+				cam_pitch = obj_var(OBJ_CAMERA, 1751);
+			}
 			for (int k = 0; k < 3; k++) free_pos[k] = cam_eye[k];
 			free_initialised = 1;
 		}
@@ -436,7 +449,12 @@ static void update(void *self, void *other) {
 
 	NetPlayer *t = find_player(target_id);
 	if (t == NULL) {
-		spectating = 0;
+		target_id = pick_target(-1);
+		t = find_player(target_id);
+	}
+	if (t == NULL) {// nobody to follow: free camera (never the frozen view of the local player)
+		view = VIEW_FREE;
+		free_initialised = 0;
 		return;
 	}
 	snprintf(target_name, sizeof target_name, "%s", t->name);
@@ -499,8 +517,11 @@ void spectator_local_checkpoint(int index, long ms) {
 	if (spectating == 0) show_gap(cup_local_id(), index, ms);
 }
 
+// checkpoint of a player (message of the server, with the index of the checkpoint): followed player while spectating,
+// or the local player while racing
 void spectator_player_checkpoint(int id, int index, long ms) {
 	if (spectating && view != VIEW_FREE && id == target_id) show_gap(id, index, ms);
+	else if (spectating == 0 && id == cup_local_id()) show_gap(id, index, ms);
 }
 
 // ---------------------------------------------------------------- rendering
@@ -524,11 +545,20 @@ static void __cdecl hook_projection(RValue *result, void *self, void *other, int
 static const int CAMERA_OVERRIDE_VARS[12] = { 1708, 1736, 1785, 1717, 1747, 1796, 1718, 1748, 1797,
 	VAR_CAMERA_MOUSE_DIRECTION, VAR_CAMERA_Z_ANGLE, VAR_CAMERA_FORWARD_OFFSET };
 
+static RValue *render_scene(void *self, void *other, RValue *result, int argc, RValue **args);
+
 static RValue *__cdecl hook_render_scene(void *self, void *other, RValue *result, int argc, RValue **args) {
 	if (mod_active() == 0) {
 		spectating = 0;
 		return orig_render_scene(self, other, result, argc, args);
 	}
+	prediction_interpolate_begin(self, other);// the other players between two steps (also for the spectator camera)
+	render_scene(self, other, result, argc, args);
+	prediction_interpolate_end();
+	return result;
+}
+
+static RValue *render_scene(void *self, void *other, RValue *result, int argc, RValue **args) {
 	update(self, other);
 	if (spectating == 0) return orig_render_scene(self, other, result, argc, args);
 
@@ -651,11 +681,11 @@ static void draw_round(void *self, void *other) {
 	double remaining;
 	if (cup_warmup(&index, &count, &remaining)) {
 		char text[64];
-		if (cup_mode() && count > 1) snprintf(text, sizeof text, "WARMUP %d / %d", index, count);
-		else if (cup_mode() == 0 && remaining >= 0) {
+		if (remaining >= 0) {// warmup with a duration: remaining time
 			long s = (long)(remaining / 1000.0 + 0.999);
 			snprintf(text, sizeof text, "WARMUP %ld:%02ld", s / 60, s % 60);
-		} else snprintf(text, sizeof text, "WARMUP");
+		} else if (count > 1) snprintf(text, sizeof text, "WARMUP %d / %d", index, count);
+		else snprintf(text, sizeof text, "WARMUP");
 		float right = x + 16 + text_width(self, other, text) * 1.6f;
 		hud_rect(x, 10, right, 18 + th, COLOUR_YELLOW, 0.85f);
 		hud_text(self, other, x + 8, 14 + th / 2, text, 1.6, COLOUR_BLACK);
@@ -670,7 +700,7 @@ static void draw_spectator_hint(void *self, void *other, double w, double h) {
 		else if (view == VIEW_THIRD_PERSON) snprintf(text, sizeof text, "SPECTATOR - third person   [V] view  [Mouse] turn around  [Left/Right] player");
 		else snprintf(text, sizeof text, "SPECTATOR - %s   [V] view  [Left/Right] player", VIEW_NAMES[view]);
 	} else {
-		snprintf(text, sizeof text, "[V] spectator mode");
+		return;// a player who races: no hint (Spectator button of the pause menu)
 	}
 		float th = text_height(self, other);
 	float top = 26 + th * 1.6f;// below the round
@@ -781,7 +811,9 @@ static void draw_checkpoint_ranking(void *self, void *other, double w, double h)
 
 // drawn right after the names of the other players: same draw state as the game's own text
 static RValue *__cdecl hook_render_usernames(void *self, void *other, RValue *result, int argc, RValue **args) {
+	prediction_interpolate_begin(self, other);// names at the displayed position of the players
 	orig_render_usernames(self, other, result, argc, args);
+	prediction_interpolate_end();
 		if (mod_active() && g_server_supports_mod && obj_var(OBJ_NETWORK_DATA, VAR_ROUND_OVER) < 0.5) {
 		double w, h;
 		render_size(self, other, &w, &h);
@@ -866,8 +898,10 @@ static RValue *__cdecl hook_reset_ask(void *self, void *other, RValue *result, i
 		snprintf(big_message, sizeof big_message, "%s", observer ? "You are now a Spectator" : "You will race from the next round");
 		big_message_until = clock_local_ms() + 3000;
 		if (observer) {
-			manual_off = 0;// spectator view at once
-			not_racing_since = clock_local_ms() - AUTO_SPECTATE_DELAY_MS;
+			not_racing_since = clock_local_ms() - AUTO_SPECTATE_DELAY_MS;// spectator view at once
+		} else {
+			view = VIEW_OFF;// back to the race (next round)
+			spectating = 0;
 		}
 		RValue r = { 0 };
 		((GmlScript)ADDR(GML_BEV_RESUME_GAME))(self, other, &r, 0, NULL);// the pause menu is closed
@@ -941,7 +975,11 @@ static RValue *__cdecl hook_draw_gui(void *self, void *other, RValue *result, in
 		set_obj_var(OBJ_PLAYER, VAR_SPEED, sqrt(mx * mx + my * my));
 		set_obj_var(OBJ_CONTROLLER, VAR_GUI_MAP_END_CREATED, 0);
 	}
+	// spectator without start signal (observer): the game writes "Waiting for server..." while delayTimeOver = 0
+	int hide_waiting = spectating && obj_var(OBJ_NETWORK_DATA, VAR_DELAY_TIME_OVER) < 0.5;
+	if (hide_waiting) set_obj_var(OBJ_NETWORK_DATA, VAR_DELAY_TIME_OVER, 1);
 	orig_draw_gui(self, other, result, argc, args);
+	if (hide_waiting) set_obj_var(OBJ_NETWORK_DATA, VAR_DELAY_TIME_OVER, 0);
 	lanbrowser_update(self, other);
 	if (t && t->inst) {
 		set_obj_var(OBJ_PLAYER, VAR_SPEED, saved_speed);

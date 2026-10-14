@@ -24,6 +24,11 @@ final class ServerPage extends JPanel {
 	private final JButton restart = Theme.secondary(T.t("Redémarrer"));
 	private final JButton restartMap = Theme.secondary(T.t("Relancer la map"));
 	private final JButton nextMap = Theme.secondary(T.t("Map suivante"));
+	private final JButton newGame = Theme.secondary(T.t("Nouvelle partie"));
+	private final JButton newGameWarmup = Theme.secondary(T.t("Nouvelle partie + warmup"));
+	private final JButton warmupRestart = Theme.secondary(T.t("Relancer le warmup"));
+	private final JButton warmupAddTime = Theme.secondary(T.t("Warmup +1 min"));
+	private final JButton warmupAddRound = Theme.secondary(T.t("+1 manche warmup"));
 	private final JButton changeMap = Theme.secondary(T.t("Changer"));
 	private final JButton joinOwn = Theme.primary(T.t("JOUER SUR MON SERVEUR"));
 	private final JComboBox<String> mapChoice = Theme.combo(new String[0]);
@@ -154,8 +159,8 @@ final class ServerPage extends JPanel {
 			left.setPreferredSize(new Dimension(230, Math.max(30, d.height)));
 			left.setMinimumSize(left.getPreferredSize());
 			JComponent input;
-			if (s.type() == ServerConf.Type.BOOL) {
-				input = Theme.check("", Boolean.parseBoolean(conf.get(s.key())));
+			if (s.type() == ServerConf.Type.BOOL || s.type() == ServerConf.Type.WARMUP_MODE) {
+				input = Theme.check("", on(s, conf.get(s.key())));
 			} else if (s.type() == ServerConf.Type.PASSWORD) {
 				input = Theme.password(conf.get(s.key()), 10);
 			} else {
@@ -175,10 +180,15 @@ final class ServerPage extends JPanel {
 		return p;
 	}
 
+	/** value of a check box setting */
+	private static boolean on(ServerConf.Setting s, String value) {
+		return s.type() == ServerConf.Type.WARMUP_MODE ? "time".equalsIgnoreCase(value) : Boolean.parseBoolean(value);
+	}
+
 	private void setInput(ServerConf.Setting s, String value) {
 		JComponent input = inputs.get(s.key());
 		if (input instanceof JCheckBox b) {
-			b.setSelected(Boolean.parseBoolean(value));
+			b.setSelected(on(s, value));
 		} else if (input instanceof JTextField f) {
 			f.setText(value);
 		}
@@ -199,7 +209,7 @@ final class ServerPage extends JPanel {
 		for (ServerConf.Setting s : ServerConf.SETTINGS) {
 			JComponent input = inputs.get(s.key());
 			if (input instanceof JCheckBox b) {
-				conf.set(s.key(), b.isSelected() ? "true" : "false");
+				conf.set(s.key(), s.type() == ServerConf.Type.WARMUP_MODE ? (b.isSelected() ? "time" : "rounds") : b.isSelected() ? "true" : "false");
 			} else if (input instanceof JPasswordField p) {
 				conf.set(s.key(), new String(p.getPassword()));
 			} else if (input instanceof JTextField f) {
@@ -264,6 +274,37 @@ final class ServerPage extends JPanel {
 		line1.add(restartMap);
 		line1.add(nextMap);
 		top.add(row(line1));
+		top.add(Box.createVerticalStrut(6));
+		// new game (scores reset) and warmup
+		newGame.addActionListener(e -> {
+			if (Dialogs.confirm(frame, T.t("Nouvelle partie"), T.t("Les points (Coupe) / les temps (Time Attack) de tous les joueurs sont remis à zéro et la map recommence. Continuer ?"))) {
+				process.command("newgame");
+			}
+		});
+		newGameWarmup.addActionListener(e -> {
+			if (Dialogs.confirm(frame, T.t("Nouvelle partie"), T.t("Les points (Coupe) / les temps (Time Attack) de tous les joueurs sont remis à zéro et la map recommence avec son warmup. Continuer ?"))) {
+				process.command("newgame warmup");
+			}
+		});
+		JPanel line1b = new JPanel(new GridLayout(1, 2, 8, 0));
+		line1b.setOpaque(false);
+		line1b.add(newGame);
+		line1b.add(newGameWarmup);
+		top.add(row(line1b));
+		top.add(Box.createVerticalStrut(6));
+		warmupRestart.addActionListener(e -> process.command("warmup restart"));
+		warmupAddTime.addActionListener(e -> process.command("warmup add 60"));
+		warmupAddRound.addActionListener(e -> process.command("warmup addround"));
+		for (JButton b : new JButton[] { warmupRestart, warmupAddTime, warmupAddRound }) {
+			b.setFont(Theme.font(Font.BOLD | Font.ITALIC, 12f));
+			b.setBorder(new javax.swing.border.EmptyBorder(9, 12, 9, 12));
+		}
+		JPanel line1c = new JPanel(new GridLayout(1, 3, 8, 0));
+		line1c.setOpaque(false);
+		line1c.add(warmupRestart);
+		line1c.add(warmupAddTime);
+		line1c.add(warmupAddRound);
+		top.add(row(line1c));
 		top.add(Box.createVerticalStrut(8));
 		JPanel line2 = new JPanel(new BorderLayout(8, 0));
 		line2.setOpaque(false);
@@ -408,6 +449,9 @@ final class ServerPage extends JPanel {
 		restart.setEnabled(on);
 		restartMap.setEnabled(on);
 		nextMap.setEnabled(on);
+		for (JButton b : new JButton[] { newGame, newGameWarmup, warmupRestart, warmupAddTime, warmupAddRound }) {
+			b.setEnabled(on);
+		}
 		changeMap.setEnabled(on);
 		mapChoice.setEnabled(on);
 		joinOwn.setEnabled(on);

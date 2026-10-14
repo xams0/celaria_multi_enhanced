@@ -61,6 +61,10 @@ public class CupState {
 		public double allFinishedDelaySec = 1;// end of the round once every player finished
 		public double startDelaySec = 1.5;// minimum time between the map load and the countdown
 		public int warmupRounds = 1;// warmup rounds at the start of every map (no points)
+		// warmup with a duration instead of rounds: one long warmup round (free practice, restarts allowed, no finish
+		// timeout) of warmupTimeSec seconds
+		public boolean warmupTimeMode = false;
+		public int warmupTimeSec = 120;
 
 		public String repartitionToString() {
 			StringBuilder b = new StringBuilder();
@@ -346,16 +350,42 @@ public class CupState {
 	public synchronized void mapChanged() {
 		roundsPlayedOnMap = 0;
 		warmupPlayedOnMap = 0;
+		warmupExtraRounds = 0;
+	}
+
+	private int warmupExtraRounds;// warmup rounds added by an admin (launcher)
+
+	/** number of warmup rounds on this map (time mode: one long round) */
+	public synchronized int getWarmupRounds() {
+		if (settings.warmupTimeMode) {
+			return (settings.warmupTimeSec > 0 ? 1 : 0) + warmupExtraRounds;
+		}
+		return settings.warmupRounds + warmupExtraRounds;
 	}
 
 	/** the next round (or the current one) is a warmup round: no points */
 	public synchronized boolean isWarmup() {
-		return roundRunning ? warmupRound : warmupPlayedOnMap < settings.warmupRounds;
+		return roundRunning ? warmupRound : warmupPlayedOnMap < getWarmupRounds();
+	}
+
+	/** the current round is a warmup with a duration (free practice: restarts allowed, no finish timeout) */
+	public synchronized boolean isTimedWarmupRound() {
+		return roundRunning && warmupRound && settings.warmupTimeMode;
 	}
 
 	/** warmup round number (starting at 1) of the current/next warmup round */
 	public synchronized int getWarmupIndex() {
-		return roundRunning && warmupRound ? warmupPlayedOnMap + 1 : Math.min(warmupPlayedOnMap + 1, settings.warmupRounds);
+		return roundRunning && warmupRound ? warmupPlayedOnMap + 1 : Math.min(warmupPlayedOnMap + 1, getWarmupRounds());
+	}
+
+	/** admin: one more warmup round on this map (rounds mode) */
+	public synchronized void addWarmupRound() {
+		warmupExtraRounds++;
+	}
+
+	/** admin: the map restarts without warmup */
+	public synchronized void skipWarmup() {
+		warmupPlayedOnMap = getWarmupRounds();
 	}
 
 	/** the round is cancelled (map changed by an admin): no points */
@@ -388,7 +418,7 @@ public class CupState {
 	 * Starts the round. All players start at the same time.
 	 */
 	public synchronized void startRound(long startTimeMS) {
-		warmupRound = warmupPlayedOnMap < settings.warmupRounds;
+		warmupRound = warmupPlayedOnMap < getWarmupRounds();
 		roundRunning = true;
 		clearRound();
 		roundStartTimeMS = startTimeMS;
@@ -454,6 +484,9 @@ public class CupState {
 		if (p.isWinner()) {
 			return 'W';
 		}
+		if (warmupRound && settings.warmupTimeMode && roundRunning && roundStartTimes.containsKey(p.playerID)) {
+			return 'R';// warmup with a duration: the players restart their runs as they like
+		}
 		if (findFinish(p.playerID) != null) {
 			return 'F';
 		}
@@ -470,11 +503,11 @@ public class CupState {
 	 * Hidden messages for the cup mod: round on the current map, then the state of every player
 	 * ("id:state" or "id:F:time" for finishers). The chat message length is sent as u8: the list is split.
 	 */
-		public synchronized List<String> buildStateMessages(double raceStartClock) {
+		public synchronized List<String> buildStateMessages(double raceStartClock, long warmupRemainingMS) {
 		List<String> messages = new ArrayList<String>();
 		int round = roundRunning || isWarmup() ? roundsPlayedOnMap + 1 : roundsPlayedOnMap;
 		messages.add("CUPROUND " + round + " " + settings.roundsPerMap + " " + (roundRunning ? 1 : 0) + " " + settings.pointsLimit + " " + server.util.ServerClock.format(raceStartClock));
-		messages.add("CUPWU " + (isWarmup() ? 1 : 0) + " " + getWarmupIndex() + " " + settings.warmupRounds + " -1");
+		messages.add("\u0001CUPWU " + (isWarmup() ? 1 : 0) + " " + getWarmupIndex() + " " + getWarmupRounds() + " " + warmupRemainingMS);
 		StringBuilder b = new StringBuilder("CUPST");
 		for (CupPlayer p : playersByID.values()) {
 			char state = roundState(p);
@@ -584,6 +617,20 @@ public class CupState {
 		}
 		CupPlayer p = playersByID.get(playerID);
 		Long start = roundStartTimes.get(playerID);
+		if (warmupRound && settings.warmupTimeMode && p != null && start != null) {
+			// warmup with a duration: every finish counts, the best one is kept
+			RoundFinish previous = findFinish(playerID);
+			if (previous != null) {
+				if (clientPreciseMS >= previous.clientPreciseTime) {
+					return null;
+				}
+				roundFinishes.remove(previous);
+			}
+			RoundFinish f = new RoundFinish(p, clientTicks * 10L, clientPreciseMS, clientTicks * 10L, receiveTimeMS, oneWayDelayMS);
+			roundFinishes.add(f);
+			computeEffectiveTimes();
+			return new FinishResult(false, roundFinishes.indexOf(f) + 1, f.effectivePreciseTime, f.effectiveTime, false);
+		}
 		if (p == null || start == null || findFinish(playerID) != null || roundEliminated.contains(playerID)) {
 			return null;
 		}
@@ -661,13 +708,13 @@ public class CupState {
 			// warmup: no points, the round doesn't count
 			warmupRound = false;
 			warmupPlayedOnMap++;
-			StringBuilder results = new StringBuilder("Warmup " + warmupPlayedOnMap + "/" + settings.warmupRounds + " over");
+			StringBuilder results = new StringBuilder("Warmup " + warmupPlayedOnMap + "/" + getWarmupRounds() + " over");
 			for (int i = 0; i < roundFinishes.size() && i < 3; i++) {
 				RoundFinish f = roundFinishes.get(i);
 				results.append(i == 0 ? ": " : ", ").append(i + 1).append(". ").append(f.player.name).append(" ").append(Util.timeFormatMS(f.effectivePreciseTime));
 			}
 			messages.add(results.toString());
-			if (warmupPlayedOnMap >= settings.warmupRounds) {
+			if (warmupPlayedOnMap >= getWarmupRounds()) {
 				messages.add("End of the warmup: the next round counts!");
 			}
 			return messages;

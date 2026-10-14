@@ -158,6 +158,12 @@ public class ServerConfig {
 		if(reader.exists("cup_startDelay")){
 			cupSettings.startDelaySec = Math.max(0.5, parseSeconds(reader.get("cup_startDelay")));
 		}
+		if(reader.exists("cup_warmupMode")){
+			cupSettings.warmupTimeMode = reader.get("cup_warmupMode").trim().equalsIgnoreCase("time");
+		}
+		if(reader.exists("cup_warmupTime")){
+			cupSettings.warmupTimeSec = Math.max(0, (int) Math.round(parseSeconds(reader.get("cup_warmupTime"))));
+		}
 		if(reader.exists("cup_warmupRounds")){
 			cupSettings.warmupRounds = Math.max(0, Integer.parseInt(reader.get("cup_warmupRounds").trim()));
 		}
