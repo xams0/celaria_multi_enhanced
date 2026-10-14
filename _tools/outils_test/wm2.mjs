@@ -1,0 +1,22 @@
+import fs from "node:fs";
+const f = "src/spectator.c"; let s = fs.readFileSync(f, "utf8");
+const o = `	((void(__cdecl *)(int))ADDR(DIRECT_DRAW_SET_FONT))(FONT_SMALL);
+	((void(__cdecl *)(int))ADDR(DIRECT_DRAW_SET_HALIGN))(0);
+	((void(__cdecl *)(int))ADDR(DIRECT_DRAW_SET_VALIGN))(2);
+	((void(__cdecl *)(float))ADDR(DIRECT_DRAW_SET_ALPHA))(0.7f);
+	((void(__cdecl *)(int))ADDR(DIRECT_DRAW_SET_COLOUR))(mod_active() ? 0x60FF60 : 0xC0C0C0);
+	draw_text(self, other, 8, h - 6, MOD_LABEL);`;
+const n = `	float top = (float)h - 30;
+	((void(__cdecl *)(int))ADDR(DIRECT_DRAW_SET_FONT))(FONT_HUD);
+	((void(__cdecl *)(int))ADDR(DIRECT_DRAW_SET_HALIGN))(0);
+	((void(__cdecl *)(int))ADDR(DIRECT_DRAW_SET_VALIGN))(1);
+	((void(__cdecl *)(float))ADDR(DIRECT_DRAW_SET_ALPHA))(0.6f);
+	((void(__cdecl *)(int))ADDR(DIRECT_DRAW_SET_COLOUR))(0x000000);
+	((void(__cdecl *)(float, float, float, float, int))ADDR(DIRECT_DRAW_RECTANGLE))(4, top, 16 + 9.0f * (float)strlen(MOD_LABEL), top + 24, 0);
+	((void(__cdecl *)(float))ADDR(DIRECT_DRAW_SET_ALPHA))(1.0f);
+	((void(__cdecl *)(int))ADDR(DIRECT_DRAW_SET_COLOUR))(mod_active() ? 0x60FF60 : 0xFFFFFF);// BGR: green when active
+	draw_text(self, other, 10, top + 12, MOD_LABEL);`;
+if (!s.includes(o)) process.exit(1);
+s = s.replace(o, n).replace('#define FONT_SMALL 15// fnt_chat\n', '');
+s = s.replace('// "Lanppart3 Mod" in the bottom left corner: the mod is loaded (grey), active on a LAN server (green)', '// "Lanppart3 Mod" in the bottom left corner: the mod is loaded (white), active on a LAN server (green)');
+fs.writeFileSync(f, s); console.log("ok");

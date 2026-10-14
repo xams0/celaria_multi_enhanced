@@ -1,0 +1,20 @@
+LIBRARY winExt.dll
+EXPORTS
+  centerMouse=winExt_orig.centerMouse
+  clampMouse=winExt_orig.clampMouse
+  getCenterOfWindowXdisplay=winExt_orig.getCenterOfWindowXdisplay
+  getCenterOfWindowYdisplay=winExt_orig.getCenterOfWindowYdisplay
+  getRegisteredMouseMovementX=winExt_orig.getRegisteredMouseMovementX
+  getRegisteredMouseMovementY=winExt_orig.getRegisteredMouseMovementY
+  getSystemTimeMilliseconds=winExt_orig.getSystemTimeMilliseconds
+  get_display_mouse_x=winExt_orig.get_display_mouse_x
+  get_display_mouse_y=winExt_orig.get_display_mouse_y
+  get_window_mouse_x=winExt_orig.get_window_mouse_x
+  get_window_mouse_y=winExt_orig.get_window_mouse_y
+  registerMouse=winExt_orig.registerMouse
+  resetScheduler=winExt_orig.resetScheduler
+  setMouseDisplay=winExt_orig.setMouseDisplay
+  setScheduler=winExt_orig.setScheduler
+  setWindowSize=winExt_orig.setWindowSize
+  showWindow=winExt_orig.showWindow
+  update=winExt_orig.update

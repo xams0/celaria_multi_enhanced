@@ -1,0 +1,34 @@
+# Only the sources of the project are published (no game files, no tools, no backups)
+/*
+!/.gitignore
+!/README.md
+!/REVERSE_NOTES.md
+!/Celaria-Server-main/
+!/CelariaMod/
+!/Lanppart3Launcher/
+!/_tools/
+/_tools/*
+!/_tools/build_server.sh
+!/_tools/outils_test/
+
+# server: build output and data of the players
+/Celaria-Server-main/build/
+/Celaria-Server-main/CelariaServer.jar
+/Celaria-Server-main/records.json
+/Celaria-Server-main/ghosts/
+
+# mod: build output
+/CelariaMod/out/
+/CelariaMod/tools/*.exe
+
+# launcher: build output (the exe is published in the GitHub releases)
+/Lanppart3Launcher/build/
+/Lanppart3Launcher/out/
+
+# test tools: running data
+/_tools/outils_test/modsrv/
+/_tools/outils_test/test/*.log
+/_tools/outils_test/test/*.err
+/_tools/outils_test/test/records.json
+
+*.log

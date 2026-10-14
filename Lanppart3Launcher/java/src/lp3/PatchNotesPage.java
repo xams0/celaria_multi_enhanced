@@ -1,0 +1,149 @@
+package lp3;
+
+import java.awt.*;
+import java.net.URI;
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+
+/** Page "Nouveautés / Patch notes": everything added since the first version, in French and English; updates. */
+final class PatchNotesPage extends JPanel {
+
+	/** {French, English} */
+	private record Item(String fr, String en) {
+	}
+
+	private record Section(String fr, String en, Item... items) {
+	}
+
+	private record Version(String number, String date, Section... sections) {
+	}
+
+	private static final Version[] VERSIONS = {
+			new Version("2.0.0", "14/10/2026",
+					new Section("Launcher Celaria Lanppart3", "Celaria Lanppart3 launcher",
+							new Item("Un seul fichier .exe : Java, serveur, mod et maps inclus, rien à installer.",
+									"One single .exe: Java, server, mod and maps included, nothing to install."),
+							new Item("Le mod est chargé dans le jeu au lancement : plus aucun fichier copié dans le dossier du jeu.",
+									"The mod is loaded into the game at start: no file copied into the game folder any more."),
+							new Item("Détection automatique de Celaria (bibliothèques Steam), démarrage de Steam si besoin.",
+									"Automatic detection of Celaria (Steam libraries), Steam started if needed."),
+							new Item("Navigateur de serveurs LAN (mode, map, joueurs) : « Rejoindre » lance le jeu et se connecte tout seul.",
+									"LAN server browser (mode, map, players): \"Join\" starts the game and connects by itself."),
+							new Item("Serveur : mode Coupe / Time Attack et tous les réglages, démarrer, arrêter, redémarrer, relancer la map, map suivante, changer de map, console et messages aux joueurs.",
+									"Server: Cup / Time Attack mode and every setting, start, stop, restart, restart the map, next map, change the map, console and messages to the players."),
+							new Item("Maps : ajouter, importer ses maps de l'éditeur, supprimer (prises en compte à la map suivante).",
+									"Maps: add, import your editor maps, delete (used from the next map)."),
+							new Item("Français / anglais, patch notes, mises à jour automatiques depuis GitHub.",
+									"French / English, patch notes, automatic updates from GitHub."),
+							new Item("Retire l'ancienne installation du mod (winExt.dll remplacé) en un clic.",
+									"Removes the old installation of the mod (replaced winExt.dll) in one click.")),
+					new Section("Course", "Racing",
+							new Item("Écart avec le 1er au milieu de l'écran à chaque checkpoint et à l'arrivée (position, temps, écart rouge / bleu), aussi pour le joueur suivi en spectateur.",
+									"Gap with the first player in the middle of the screen at every checkpoint and at the finish (position, time, red / blue gap), also for the followed player when spectating."),
+							new Item("Respawn : retour au dernier checkpoint ou au départ, le chrono continue. Plus de DNF (réglable).",
+									"Respawn: back to the last checkpoint or to the start, the timer continues. No DNF any more (setting)."),
+							new Item("Restart (remise à zéro complète) = DNF en Coupe (réglable).", "Restart (complete reset) = DNF in Cup mode (setting)."),
+							new Item("Warmup au début de chaque map (manches sans points en Coupe, durée en Time Attack), affiché à côté du numéro de manche.",
+									"Warmup at the start of every map (rounds without points in Cup mode, duration in Time Attack), shown next to the round number."),
+							new Item("Fin de manche sans flash blanc, transitions plus rapides (délais réglables).",
+									"End of round without white flash, faster transitions (adjustable delays).")),
+					new Section("Spectateur et Time Attack", "Spectator and Time Attack",
+							new Item("Vue 1re personne fluide : la caméra du joueur suivi est interpolée, positions envoyées 60 fois par seconde.",
+									"Smooth first person view: the camera of the followed player is interpolated, positions sent 60 times per second."),
+							new Item("Toutes les fonctions du mod marchent aussi en Time Attack (observateur, classement aux checkpoints, chrono du joueur suivi).",
+									"Every feature of the mod also works in Time Attack (observer, checkpoint ranking, timer of the followed player)."),
+							new Item("Le serveur accepte les maps de l'éditeur actuel (format 3).", "The server accepts the maps of the current editor (format 3)."))),
+			new Version("1.0.0", "13/10/2026",
+					new Section("Mode Coupe (règles Trackmania)", "Cup mode (Trackmania rules)",
+							new Item("Points par place, finaliste à la limite de points, un finaliste qui gagne une manche gagne la coupe, plusieurs vainqueurs possibles.",
+									"Points per rank, finalist at the points limit, a finalist who wins a round wins the cup, several winners possible."),
+							new Item("Plusieurs manches par map, temps limite après le 1er arrivé, temps mesurés au millième.",
+									"Several rounds per map, time limit after the first finisher, times measured to the millisecond."),
+							new Item("Départ synchronisé : le compte à rebours du jeu est calé sur l'horloge du serveur pour tout le monde.",
+									"Synchronized start: the countdown of the game follows the server clock for everybody."),
+							new Item("Interface : ROUND x / y, classement aux checkpoints, badges WINNER / FINALIST, classement plus large.",
+									"Interface: ROUND x / y, checkpoint ranking, WINNER / FINALIST badges, wider leaderboard."),
+							new Item("Bots qui rejouent le meilleur run de la map (/bots).", "Bots replaying the best run of the map (/bots).")),
+					new Section("Mod Lanppart3", "Lanppart3 mod",
+							new Item("Actif seulement sur un serveur du réseau local (LAN, Radmin VPN, Hamachi) : étiquette « Lanppart3 Mod ».",
+									"Only active on a server of the local network (LAN, Radmin VPN, Hamachi): \"Lanppart3 Mod\" label."),
+							new Item("Chrono et temps au millième (affichage ; le temps officiel du jeu n'est jamais changé).",
+									"Timer and times to the millisecond (display; the official time of the game is never changed)."),
+							new Item("Adversaires affichés au même temps de course que soi, sans retard de lissage.",
+									"Opponents shown at the same race time as you, without smoothing delay."),
+							new Item("Spectateur : 1re personne, 3e personne, caméra libre, automatique après l'arrivée, nom, chrono et vitesse du joueur suivi.",
+									"Spectator: first person, third person, free camera, automatic after the finish, name, timer and speed of the followed player."),
+							new Item("Mode observateur (caster) : bouton Spectator du menu Échap, /spec et /play.",
+									"Observer (caster) mode: Spectator button of the Escape menu, /spec and /play."),
+							new Item("Onglet Records (records du serveur au millième), navigateur de serveurs LAN dans le jeu.",
+									"Records tab (server records to the millisecond), LAN server browser in the game."),
+							new Item("Rien n'est envoyé à Steam sur un serveur Lanppart3 (scores, expérience).",
+									"Nothing is sent to Steam on a Lanppart3 server (scores, experience)."))),
+	};
+
+	private final LauncherFrame frame;
+
+	PatchNotesPage(LauncherFrame frame) {
+		super(new BorderLayout(0, 14));
+		this.frame = frame;
+		setOpaque(false);
+		Theme.Card card = new Theme.Card(new BorderLayout(0, 12));
+		JPanel top = new JPanel(new BorderLayout());
+		top.setOpaque(false);
+		top.add(Theme.title(T.t("Patch notes")), BorderLayout.WEST);
+		JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+		buttons.setOpaque(false);
+		JLabel version = Theme.label("v" + Updater.currentVersion(), Font.BOLD | Font.ITALIC, 14f, Theme.ACCENT);
+		buttons.add(version);
+		JButton check = Theme.secondary(T.t("Vérifier les mises à jour"));
+		check.addActionListener(e -> frame.checkUpdate(true));
+		JButton github = Theme.secondary(T.t("Page GitHub"));
+		github.addActionListener(e -> {
+			try {
+				Desktop.getDesktop().browse(new URI("https://github.com/" + Updater.REPO));
+			} catch (Exception ignored) {
+			}
+		});
+		buttons.add(check);
+		buttons.add(github);
+		top.add(buttons, BorderLayout.EAST);
+		card.add(top, BorderLayout.NORTH);
+
+		JEditorPane html = new JEditorPane("text/html", html());
+		html.setEditable(false);
+		html.setOpaque(true);
+		html.setBackground(Theme.PANEL2);
+		html.setBorder(new EmptyBorder(10, 16, 10, 16));
+		html.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, Boolean.TRUE);
+		html.setFont(Theme.font(Font.PLAIN, 14f));
+		html.setCaretPosition(0);
+		card.add(Theme.scroll(html), BorderLayout.CENTER);
+		add(card, BorderLayout.CENTER);
+	}
+
+	private static String hex(Color c) {
+		return String.format("#%06x", c.getRGB() & 0xFFFFFF);
+	}
+
+	private static String esc(String s) {
+		return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+	}
+
+	private static String html() {
+		boolean en = T.english();
+		StringBuilder b = new StringBuilder("<html><body style='font-family:\"" + Theme.FAMILY + "\"; color:" + hex(Theme.TEXT) + "; font-size:11pt'>");
+		for (Version v : VERSIONS) {
+			b.append("<div style='margin-top:6px'><span style='font-size:17pt; font-weight:bold; font-style:italic; color:").append(hex(Theme.ACCENT))
+					.append("'>V").append(v.number()).append("</span>&nbsp;&nbsp;<span style='color:").append(hex(Theme.MUTED)).append("'>")
+					.append(v.date()).append("</span></div>");
+			for (Section s : v.sections()) {
+				b.append("<div style='margin-top:8px; font-weight:bold; font-size:12pt'>").append(esc(en ? s.en() : s.fr())).append("</div><ul style='margin-top:2px'>");
+				for (Item i : s.items()) {
+					b.append("<li style='margin-bottom:3px'>").append(esc(en ? i.en() : i.fr())).append("</li>");
+				}
+				b.append("</ul>");
+			}
+		}
+		return b.append("</body></html>").toString();
+	}
+}
