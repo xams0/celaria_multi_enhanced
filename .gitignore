@@ -9,6 +9,8 @@
 !/_tools/
 /_tools/*
 !/_tools/build_server.sh
+!/_tools/release.mjs
+!/_tools/backup.ps1
 !/_tools/outils_test/
 
 # server: build output and data of the players
