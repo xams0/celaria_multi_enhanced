@@ -19,6 +19,13 @@ final class PatchNotesPage extends JPanel {
 	}
 
 	private static final Version[] VERSIONS = {
+			new Version("2.4.2", "14/10/2026",
+					new Section("Spectateur", "Spectator",
+							new Item("Les noms des joueurs restent affichés tout le temps (ils disparaissaient au bout de quelques secondes : le jeu mesurait la distance depuis la position de votre joueur).",
+									"The names of the players stay shown all the time (they disappeared after a few seconds: the game measured the distance from the position of your player)."),
+							new Item("Chaque nom est affiché au-dessus de son joueur (ils étaient placés depuis la caméra de votre joueur et se superposaient) ; seuls les joueurs présents à l'image ont leur nom.",
+									"Each name is shown above its player (they were placed from the camera of your player and overlapped); only the players in the picture have their name."),
+							new Item("Touche B pour cacher / afficher les noms des joueurs.", "Key B to hide / show the names of the players."))),
 			new Version("2.4.1", "14/10/2026",
 					new Section("Spectateur", "Spectator",
 							new Item("Cliquer sur un joueur dans le classement (Tab, manche ou coupe) le suit à la caméra (la caméra libre passe en vue 1re personne).",

@@ -91,6 +91,7 @@ static int gap_finish_shown = -1;// followed player whose finish was shown
 static void show_gap(int id, int checkpoint, long ms);
 static void gap_clear(void);
 static int target_id = -1;// networkPlayerID of the followed player
+static int names_hidden;// spectator: names of the players hidden (B)
 static int spectating;// view active and allowed this frame
 static double target_lost_since;// the followed player stopped racing (local ms), 0 = racing
 static int finish_screen_closed;
@@ -368,6 +369,11 @@ static void update(void *self, void *other) {
 	int focus = game_has_focus();
 	int v_pressed = focus && key_pressed('V');
 	int clicked = key_pressed(VK_LBUTTON) && focus;
+	int b_pressed = key_pressed('B') && focus;
+	if (b_pressed && view != VIEW_OFF) {
+		names_hidden = !names_hidden;
+		mod_log("spectator: names of the players %s", names_hidden ? "hidden" : "shown");
+	}
 	// leaderboard (Tab, end of the round) or pause menu open: the mouse is used by the menus, the camera doesn't move
 	int leaderboard = leaderboard_panel_open();
 	int ui_open = leaderboard || obj_var(OBJ_CONTROLLER, VAR_PAUSE) > 0.5;
@@ -611,37 +617,77 @@ static RValue *__cdecl hook_render_scene(void *self, void *other, RValue *result
 	return result;
 }
 
-static RValue *render_scene(void *self, void *other, RValue *result, int argc, RValue **args) {
-	update(self, other);
-	if (spectating == 0) return orig_render_scene(self, other, result, argc, args);
+// The camera of the game (obj_camera and its previous values) is replaced by the spectator camera during the rendering
+// of the scene and of the names of the players (their transparency depends on the distance to the camera). First
+// person: the model (and the name) of the followed player would be around the camera: moved away.
+static struct {
+	int active, pre_instance;
+	double saved[2][12];
+	NetPlayer *hidden;
+	double hidden_z;
+} cam_override;
 
+static void spectator_camera_begin(void) {
 	RValue pre = { 0 };
 	YY_VAR_GET(OBJ_CAMERA, VAR_PRE_VALUES, ARRAY_NONE, &pre);
-	int pre_instance = YY_GET_INT32(&pre);
+	cam_override.pre_instance = YY_GET_INT32(&pre);
 	yy_clear(&pre);
 	double values[12] = { cam_eye[0], cam_eye[1], cam_eye[2], cam_dir[0], cam_dir[1], cam_dir[2], cam_up[0], cam_up[1], cam_up[2],
 		-cam_yaw, asin(cam_dir[2] > 1 ? 1 : cam_dir[2] < -1 ? -1 : cam_dir[2]) * 180.0 / M_PI, 0 };
-	double saved[2][12];
 	for (int k = 0; k < 12; k++) {
-		saved[0][k] = obj_var(OBJ_CAMERA, CAMERA_OVERRIDE_VARS[k]);
-		saved[1][k] = obj_var(pre_instance, CAMERA_OVERRIDE_VARS[k]);
+		cam_override.saved[0][k] = obj_var(OBJ_CAMERA, CAMERA_OVERRIDE_VARS[k]);
+		cam_override.saved[1][k] = obj_var(cam_override.pre_instance, CAMERA_OVERRIDE_VARS[k]);
 		set_obj_var(OBJ_CAMERA, CAMERA_OVERRIDE_VARS[k], values[k]);
-		set_obj_var(pre_instance, CAMERA_OVERRIDE_VARS[k], values[k]);
+		set_obj_var(cam_override.pre_instance, CAMERA_OVERRIDE_VARS[k], values[k]);
 	}
-	// first person: the model of the followed player would be around the camera
 	NetPlayer *t = view == VIEW_FIRST_PERSON ? find_player(target_id) : NULL;
-	double hidden_z = 0;
-	if (t && t->inst) {
+	cam_override.hidden = t && t->inst ? t : NULL;
+	if (cam_override.hidden) {
 		RValue *mz = yy_self_var(t->inst, VAR_MODEL_Z);
-		hidden_z = yy_to_real(mz);
-		yy_set_real(mz, hidden_z - 100000);
+		cam_override.hidden_z = yy_to_real(mz);
+		yy_set_real(mz, cam_override.hidden_z - 100000);
 	}
-	orig_render_scene(self, other, result, argc, args);
-	if (t && t->inst) yy_set_real(yy_self_var(t->inst, VAR_MODEL_Z), hidden_z);
+	cam_override.active = 1;
+}
+
+static void spectator_camera_end(void) {
+	if (cam_override.active == 0) return;
+	if (cam_override.hidden) yy_set_real(yy_self_var(cam_override.hidden->inst, VAR_MODEL_Z), cam_override.hidden_z);
 	for (int k = 0; k < 12; k++) {
-		set_obj_var(OBJ_CAMERA, CAMERA_OVERRIDE_VARS[k], saved[0][k]);
-		set_obj_var(pre_instance, CAMERA_OVERRIDE_VARS[k], saved[1][k]);
+		set_obj_var(OBJ_CAMERA, CAMERA_OVERRIDE_VARS[k], cam_override.saved[0][k]);
+		set_obj_var(cam_override.pre_instance, CAMERA_OVERRIDE_VARS[k], cam_override.saved[1][k]);
 	}
+	cam_override.active = 0;
+}
+
+// once per frame, before the camera matrices of the frame are computed
+static unsigned updated_frame = (unsigned)-1;
+static void update_once(void *self, void *other) {
+	if (updated_frame == g_frame) return;
+	updated_frame = g_frame;
+	update(self, other);
+}
+
+// matrices of the camera kept by the game for the 3D -> screen conversions (names of the players above them): computed
+// before the scene, from the spectator camera while spectating
+#define GML_STEP_CONTROLLER_REFRESH_CAMERA_MATRICES 0x007bb960
+static GmlScript orig_refresh_camera_matrices;
+static RValue *__cdecl hook_refresh_camera_matrices(void *self, void *other, RValue *result, int argc, RValue **args) {
+	if (mod_active() == 0) return orig_refresh_camera_matrices(self, other, result, argc, args);
+	update_once(self, other);
+	if (spectating == 0) return orig_refresh_camera_matrices(self, other, result, argc, args);
+	spectator_camera_begin();
+	orig_refresh_camera_matrices(self, other, result, argc, args);
+	spectator_camera_end();
+	return result;
+}
+
+static RValue *render_scene(void *self, void *other, RValue *result, int argc, RValue **args) {
+	update_once(self, other);
+	if (spectating == 0) return orig_render_scene(self, other, result, argc, args);
+	spectator_camera_begin();
+	orig_render_scene(self, other, result, argc, args);
+	spectator_camera_end();
 	return result;
 }
 
@@ -749,9 +795,9 @@ static void draw_spectator_hint(void *self, void *other, double w, double h) {
 	if (spectating_allowed() == 0) return;
 	char text[160];
 	if (spectating) {
-		if (view == VIEW_FREE) snprintf(text, sizeof text, "SPECTATOR - free camera   [V] view  [Mouse] look  [ZQSD/WASD] move  [Space/C] up/down  [Shift] fast");
-		else if (view == VIEW_THIRD_PERSON) snprintf(text, sizeof text, "SPECTATOR - third person   [V] view  [Mouse] turn around  [Left/Right] player");
-		else snprintf(text, sizeof text, "SPECTATOR - %s   [V] view  [Left/Right] player", VIEW_NAMES[view]);
+		if (view == VIEW_FREE) snprintf(text, sizeof text, "SPECTATOR - free camera   [V] view  [Mouse] look  [ZQSD/WASD] move  [Space/C] up/down  [Shift] fast  [B] names");
+		else if (view == VIEW_THIRD_PERSON) snprintf(text, sizeof text, "SPECTATOR - third person   [V] view  [Mouse] turn around  [Left/Right] player  [B] names");
+		else snprintf(text, sizeof text, "SPECTATOR - %s   [V] view  [Left/Right] player  [B] names", VIEW_NAMES[view]);
 	} else {
 		return;// a player who races: no hint (Spectator button of the pause menu)
 	}
@@ -868,9 +914,14 @@ static void draw_checkpoint_ranking(void *self, void *other, double w, double h)
 
 // drawn right after the names of the other players: same draw state as the game's own text
 static RValue *__cdecl hook_render_usernames(void *self, void *other, RValue *result, int argc, RValue **args) {
-	prediction_interpolate_begin(self, other);// names at the displayed position of the players
-	orig_render_usernames(self, other, result, argc, args);
-	prediction_interpolate_end();
+	// spectator: names seen from the spectator camera (else they fade out far from the local player), hidden with B
+	if (spectating == 0 || names_hidden == 0) {
+		prediction_interpolate_begin(self, other);// names at the displayed position of the players
+		if (spectating) spectator_camera_begin();
+		orig_render_usernames(self, other, result, argc, args);
+		spectator_camera_end();
+		prediction_interpolate_end();
+	}
 		if (mod_active() && g_server_supports_mod && obj_var(OBJ_NETWORK_DATA, VAR_ROUND_OVER) < 0.5) {
 		double w, h;
 		render_size(self, other, &w, &h);
@@ -1173,6 +1224,7 @@ void spectator_install(void) {
 	static const uint8_t native_prologue[] = { 0x56, 0x8B, 0x74, 0x24, 0x18 };// push esi; mov esi,[esp+18h]
 	orig_projection = (NativeFn)hook_install(ADDR(NATIVE_D3D_SET_PROJECTION_EXT), native_prologue, sizeof native_prologue, hook_projection);
 	orig_render_scene = (GmlScript)hook_install(ADDR(GML_SCR_RENDER_SCENE), PROLOGUE, sizeof PROLOGUE, hook_render_scene);
+	orig_refresh_camera_matrices = (GmlScript)hook_install(ADDR(GML_STEP_CONTROLLER_REFRESH_CAMERA_MATRICES), PROLOGUE, sizeof PROLOGUE, hook_refresh_camera_matrices);
 	orig_draw_player_model_allowed = (GmlScript)hook_install(ADDR(GML_DRAW_PLAYER_MODEL_ALLOWED), PROLOGUE, sizeof PROLOGUE, hook_draw_player_model_allowed);
 	orig_render_usernames = (GmlScript)hook_install(ADDR(GML_SCR_RENDER_USERNAMES), PROLOGUE, sizeof PROLOGUE, hook_render_usernames);
 	orig_draw_gui = (GmlScript)hook_install(ADDR(GML_SCR_DRAW_GUI), PROLOGUE, sizeof PROLOGUE, hook_draw_gui);

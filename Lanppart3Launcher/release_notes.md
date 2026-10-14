@@ -1,11 +1,9 @@
 **Français**
-- Spectateur : cliquer sur un joueur dans le classement (Tab, manche ou coupe) le suit à la caméra (la caméra libre passe en vue 1re personne).
-- Spectateur : la caméra ne bouge plus avec la souris quand le classement (Tab) ou le menu Échap est ouvert.
-- Fin de manche / arrivée : la bande noire du menu à gauche ne couvre plus que ses boutons (en bas) ; le classement des écarts en haut à gauche reste visible.
-- Les spectateurs connectés sont affichés en bas à gauche (œil + nom), au-dessus de « Lanppart3 Mod », quand les classements sont à l'écran (Coupe et Time Attack).
+- Spectateur : les noms des joueurs restent affichés tout le temps (ils disparaissaient au bout de quelques secondes, le jeu mesurait la distance depuis la position de votre joueur).
+- Spectateur : chaque nom est affiché au-dessus de son joueur (ils étaient placés depuis la caméra de votre joueur et se superposaient) ; seuls les joueurs présents à l'image ont leur nom.
+- Spectateur : touche B pour cacher / afficher les noms des joueurs.
 
 **English**
-- Spectator: clicking a player in the leaderboard (Tab, round or cup) follows him with the camera (the free camera switches to the first person view).
-- Spectator: the camera no longer moves with the mouse while the leaderboard (Tab) or the Escape menu is open.
-- End of the round / finish: the black bar of the left menu only covers its buttons (at the bottom); the gap ranking at the top left stays visible.
-- The connected spectators are shown at the bottom left (eye + name), above "Lanppart3 Mod", while the rankings are on screen (Cup and Time Attack).
+- Spectator: the names of the players stay shown all the time (they disappeared after a few seconds, the game measured the distance from the position of your player).
+- Spectator: each name is shown above its player (they were placed from the camera of your player and overlapped); only the players in the picture have their name.
+- Spectator: key B to hide / show the names of the players.
