@@ -790,6 +790,14 @@ static void draw_round(void *self, void *other) {
 		float right = x + 16 + text_width(self, other, text) * 1.6f;
 		hud_rect(x, 10, right, 18 + th, COLOUR_YELLOW, 0.85f);
 		hud_text(self, other, x + 8, 14 + th / 2, text, 1.6, COLOUR_BLACK);
+		// goal reached: countdown of the automatic restart below the warmup box
+		double restart = respawn_warmup_remaining_ms();
+		if (restart >= 0) {
+			snprintf(text, sizeof text, "RESPAWN IN %ld", (long)(restart / 1000.0 + 0.999));
+			float r2 = x + 16 + text_width(self, other, text) * 1.6f;
+			hud_rect(x, 26 + th, r2, 34 + th * 2, COLOUR_BLACK, 0.6f);
+			hud_text(self, other, x + 8, 30 + th * 1.5f, text, 1.6, COLOUR_YELLOW);
+		}
 	}
 }
 
@@ -894,7 +902,7 @@ static void draw_checkpoint_ranking(void *self, void *other, double w, double h)
 	float width = col_time + text_width(self, other, "+00:00:000") * fs + 16;
 	// top left, below the round / warmup boxes (and the hint of the spectator)
 	float th1 = text_height(self, other);
-	float top = 26 + th1 * 1.6f + (spectating ? th1 + 14 : 0);
+	float top = 26 + th1 * 1.6f + (spectating ? th1 + 14 : respawn_warmup_remaining_ms() >= 0 ? th1 * 1.6f + 16 : 0);
 	float left = 10, right = left + width, bottom = top + line_h * (float)count + 8;
 	(void)w;
 	(void)h;

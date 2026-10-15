@@ -19,6 +19,20 @@ final class PatchNotesPage extends JPanel {
 	}
 
 	private static final Version[] VERSIONS = {
+			new Version("2.4.4", "15/10/2026",
+					new Section("Warmup", "Warmup",
+							new Item("Après l'arrivée, le run repart tout seul au bout de 5 secondes si vous n'appuyez pas sur Respawn / Restart (pas en spectateur).",
+									"After the finish, the run restarts by itself after 5 seconds if you don't press Respawn / Restart (not while spectating)."),
+							new Item("Un compte à rebours « RESPAWN IN 5 » s'affiche sous WARMUP.", "A \"RESPAWN IN 5\" countdown is shown below WARMUP.")),
+					new Section("Maps", "Maps",
+							new Item("Glisser-déposer des fichiers .cmap (ou un dossier de maps) depuis l'Explorateur directement dans la liste des maps.",
+									"Drag and drop .cmap files (or a folder of maps) from the Explorer directly into the list of maps."),
+							new Item("Ordre de passage des maps : faites glisser les maps dans la liste, ou flèches ▲ / ▼ (fichier maps/maplist.txt lu par le serveur).",
+									"Playing order of the maps: drag the maps in the list, or ▲ / ▼ arrows (file maps/maplist.txt read by the server)."),
+							new Item("Case « Ordre aléatoire » : le serveur mélange les maps, chacune passe une fois avant qu'une map revienne, jamais deux fois de suite la même.",
+									"\"Random order\" box: the server shuffles the maps, each one is played once before a map comes back, never the same one twice in a row."),
+							new Item("Un serveur lancé prend en compte l'ordre et le mode aléatoire à la map suivante (aussi pour « Map suivante »).",
+									"A running server uses the order and the random mode at the next map (also for \"Next map\")."))),
 			new Version("2.4.3", "14/10/2026",
 					new Section("Spectateur", "Spectator",
 							new Item("Vue 3e personne : le modèle et le nom du joueur suivi ne sont plus dédoublés (la caméra suit maintenant la position affichée du joueur, à la même heure que les modèles et les noms).",

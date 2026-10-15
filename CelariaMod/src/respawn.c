@@ -58,6 +58,56 @@ void respawn_update(void *self, void *other) {
 	last = t;
 }
 
+// Warmup: after the goal, the run restarts by itself after WARMUP_RESTART_MS if the player didn't press respawn / restart
+// (the finish screen of the game restarts the map with these keys: step_controller -> bev_map_restart). Not while
+// spectating, not for an observer, not at the end of the round.
+#define OBJ_CONTROLLER 0x50
+#define OBJ_NETWORK_DATA 0x59
+#define VAR_MAP_FINISHED 820// obj_controller: the local player reached the goal
+#define VAR_MULTIPLAYER 965
+#define VAR_ROUND_OVER 1174// obj_network_data
+#define WARMUP_RESTART_MS 5000
+
+static double finish_since;// local time (ms) of the goal of a warmup run, 0 = none
+
+static double ctrl_var(int object, int var) {
+	RValue v = { 0 };
+	YY_VAR_GET(object, var, ARRAY_NONE, &v);
+	double d = yy_to_real(&v);
+	yy_clear(&v);
+	return d;
+}
+
+// remaining time before the automatic restart of the warmup run (ms), -1 if none
+double respawn_warmup_remaining_ms(void) {
+	if (finish_since <= 0) return -1;
+	double r = WARMUP_RESTART_MS - (clock_local_ms() - finish_since);
+	return r < 0 ? 0 : r;
+}
+
+// step of the game (100 Hz, step_controller)
+void respawn_step(void *self, void *other) {
+	int index, count;
+	double remaining;
+	int waiting = mod_active() && g_server_supports_mod && ctrl_var(OBJ_CONTROLLER, VAR_MULTIPLAYER) > 0.5
+		&& cup_warmup(&index, &count, &remaining) && ctrl_var(OBJ_CONTROLLER, VAR_MAP_FINISHED) > 0.5
+		&& ctrl_var(OBJ_NETWORK_DATA, VAR_ROUND_OVER) < 0.5 && spectator_active() == 0 && cup_state(cup_local_id()) != 'V';
+	if (waiting == 0) {
+		finish_since = 0;
+		return;
+	}
+	double now = clock_local_ms();
+	if (finish_since <= 0) {
+		finish_since = now;
+	} else if (now - finish_since >= WARMUP_RESTART_MS && orig_map_restart) {
+		finish_since = 0;
+		mod_log("warmup: automatic restart after the goal");
+		RValue r = { 0 };
+		orig_map_restart(self, other, &r, 0, NULL);// what the restart key does on the finish screen
+		yy_clear(&r);
+	}
+}
+
 void respawn_install(void) {
 	orig_map_restart = (GmlScript)hook_install(ADDR(GML_BEV_MAP_RESTART), PROLOGUE, sizeof PROLOGUE, hook_map_restart);
 }

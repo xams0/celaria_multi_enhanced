@@ -2,7 +2,11 @@ package server;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -89,6 +93,23 @@ public class ServerProcessor implements Runnable{
 	private volatile boolean mapRequestWarmup;
 	private boolean forcedWarmup;
 
+	private final List<String> randomMaps = new ArrayList<String>();// random rotation: maps not played yet in this cycle
+
+	/** random rotation: next map of a shuffled cycle (every map once, never the current map twice in a row) */
+	private int randomMapIndex(String[] list, String current) {
+		randomMaps.retainAll(Arrays.asList(list));
+		randomMaps.remove(current);
+		if (randomMaps.isEmpty()) {
+			for (String m : list) {
+				if (m.equals(current) == false || list.length == 1) {
+					randomMaps.add(m);
+				}
+			}
+			Collections.shuffle(randomMaps);
+		}
+		return Math.max(0, Arrays.asList(list).indexOf(randomMaps.remove(0)));
+	}
+
 	public int getCurrentMapIndex() {
 		return currentMapIndex;
 	}
@@ -117,7 +138,7 @@ public class ServerProcessor implements Runnable{
 			return;
 		}
 		if (kind == 1) {
-			index = (index + 1) % list.length;
+			index = FileUtil.isRandomMapOrder(mapDirectory) ? randomMapIndex(list, current) : (index + 1) % list.length;
 		} else if (index < 0) {
 			index = 0;
 		}
@@ -412,7 +433,11 @@ public class ServerProcessor implements Runnable{
 							}
 						}
 						if(replayMap == false || currentMapIndex < 0) {
-							currentMapIndex++;
+							if (forcedNow == false && FileUtil.isRandomMapOrder(mapDirectory)) {
+								currentMapIndex = randomMapIndex(core.getRessourceHandler().getMapFileList(), state.getCurrentMapName());
+							} else {
+								currentMapIndex++;
+							}
 						}
 						state.setTimeAttackWarmupPending(state.isCupMode() == false && afterWarmup == false && (forcedNow == false || forcedWarmup));
 						if(currentMapIndex >= core.getRessourceHandler().getMapFileList().length){

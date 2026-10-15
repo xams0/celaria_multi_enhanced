@@ -14,8 +14,8 @@ Coupe / Time Attack, le mod (DLL) et les maps de base. À copier sur chaque PC d
   redémarrer, relancer la map, map suivante, changer de map, console (commandes, `say <texte>` pour écrire aux joueurs),
   « JOUER SUR MON SERVEUR ». Au premier lancement du serveur, Windows demande l'accès au réseau pour Java : **Autoriser**
   (sinon les autres PC ne peuvent pas rejoindre).
-- **MAPS** : maps du serveur (rotation par ordre alphabétique), ajouter des `.cmap`, importer ses maps de l'éditeur
-  (`%LOCALAPPDATA%\Celaria\custom_maps`), supprimer. Pris en compte au prochain changement de map.
+- **MAPS** : maps du serveur, ajouter des `.cmap` (bouton ou glisser-déposer depuis l'Explorateur), importer ses maps de l'éditeur, ordre de passage (glisser dans la liste, flèches) ou ordre aléatoire, enregistrés dans `maps/maplist.txt` (lu par le serveur à chaque changement de map)
+  (éditeur : `%LOCALAPPDATA%\Celaria\custom_maps`), supprimer.
 
 Si l'ancienne version du mod (winExt.dll remplacé, `winExt_orig.dll` présent) est dans le dossier du jeu, le launcher
 propose de la retirer (restaure le winExt.dll d'origine).

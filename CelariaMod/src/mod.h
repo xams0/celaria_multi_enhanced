@@ -55,6 +55,9 @@ void lanbrowser_wrap_natives(void);
 // respawn.c: respawn without timer reset, restart = DNF (cup)
 void respawn_install(void);
 void respawn_update(void *self, void *other);
+// warmup: automatic restart 5 s after the goal (step of the game), remaining time for the HUD (-1 = none)
+void respawn_step(void *self, void *other);
+double respawn_warmup_remaining_ms(void);
 // autoconnect.c: connection to the server chosen in the launcher
 void autoconnect_install(void);
 void autoconnect_update(void *self, void *other);

@@ -213,8 +213,16 @@ public final class T {
 		e("Maps créées avec l'éditeur de Celaria (custom_maps)", "Maps made with the Celaria editor (custom_maps)");
 		e("Supprimer", "Delete");
 		e("Ouvrir le dossier", "Open the folder");
-		e("Les maps tournent dans l'ordre alphabétique des fichiers. Un serveur lancé prend en compte les changements à la map suivante.",
-				"Maps rotate in the alphabetical order of the files. A running server uses the changes at the next map.");
+		e("Glisse des fichiers .cmap sur la liste pour les ajouter, glisse les maps dans la liste pour changer l'ordre de passage. Un serveur lancé prend en compte les changements à la map suivante.",
+				"Drop .cmap files on the list to add them, drag the maps in the list to change the playing order. A running server uses the changes at the next map.");
+		e("Ordre aléatoire", "Random order");
+		e("Le serveur mélange les maps : chacune passe une fois avant qu'une map revienne",
+				"The server shuffles the maps: each one is played once before a map comes back");
+		e("Maps dans un ordre aléatoire.", "Maps in a random order.");
+		e("Maps dans l'ordre de la liste.", "Maps in the order of the list.");
+		e("Monter", "Move up");
+		e("Descendre", "Move down");
+		e("Choisis les maps à déplacer.", "Choose the maps to move.");
 		e("Ajouter des maps Celaria (.cmap)", "Add Celaria maps (.cmap)");
 		e("Maps Celaria (*.cmap)", "Celaria maps (*.cmap)");
 		e("%s : ce n'est pas une map Celaria", "%s: not a Celaria map");

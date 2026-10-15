@@ -74,6 +74,7 @@ static void connect_now(void *self, void *other) {
 
 static RValue *__cdecl hook_step_controller(void *self, void *other, RValue *result, int argc, RValue **args) {
 	orig_step_controller(self, other, result, argc, args);
+	respawn_step(self, other);
 	if (state == 2 && ++steps >= 300) {
 		state = 3;
 		mod_log("launcher: Multiplayer menu");
@@ -91,6 +92,8 @@ void autoconnect_update(void *self, void *other) {
 }
 
 void autoconnect_install(void) {
+	// step of the game, also used by respawn.c (automatic restart in warmup)
+	orig_step_controller = (GmlScript)hook_install(ADDR(GML_STEP_CONTROLLER), PROLOGUE, sizeof PROLOGUE, hook_step_controller);
 	char value[160];
 	DWORD n = GetEnvironmentVariableA("LP3_CONNECT", value, sizeof value);
 	if (n == 0 || n >= sizeof value) return;
@@ -103,7 +106,6 @@ void autoconnect_install(void) {
 	if (port <= 0 || port > 65535 || address[0] == 0) return;
 	orig_menu_main = (GmlScript)hook_install(ADDR(GML_MENU_MAIN), PROLOGUE, sizeof PROLOGUE, hook_menu_main);
 	orig_menu_multiplayer = (GmlScript)hook_install(ADDR(GML_MENU_MULTIPLAYER), PROLOGUE, sizeof PROLOGUE, hook_menu_multiplayer);
-	orig_step_controller = (GmlScript)hook_install(ADDR(GML_STEP_CONTROLLER), PROLOGUE, sizeof PROLOGUE, hook_step_controller);
 	if (orig_menu_main && orig_menu_multiplayer && orig_step_controller) state = 1;
 	mod_log("launcher: connection to %s:%d after the main menu", address, port);
 }
